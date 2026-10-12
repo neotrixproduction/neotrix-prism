@@ -137,6 +137,7 @@ def test_orb_cancels_busy_task_and_stops_motion(window):
     window.apply_theme()
     window.orb.set_busy(True)
     assert window.orb.spin.state() == QAbstractAnimation.Stopped
+    assert not window.progress_bar.isVisible()
     window.orb.set_busy(False)
     window.navigate('Home')
     assert window.pages['Home'].graphicsEffect() is None

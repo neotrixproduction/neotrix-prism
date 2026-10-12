@@ -248,6 +248,7 @@ class MainWindow(QMainWindow):
                 widget.set_hover(0)
                 widget.set_reveal(1)
         self.orb.set_busy(bool(self.jobs))
+        self.progress_bar.setVisible(bool(self.jobs) and not self.settings.data["reduced_motion"])
 
     def move_selection(self, name):
         target = self.nav[name].geometry()
@@ -498,7 +499,7 @@ class MainWindow(QMainWindow):
         self.jobs.append(job)
         self.orb.show()
         self.orb.set_busy(True)
-        self.progress_bar.show()
+        self.progress_bar.setVisible(not self.settings.data["reduced_motion"])
         self.cancel_button.show()
         job.start()
         return job
