@@ -1,0 +1,12 @@
+/* Neotrix design system. Original artwork and interface. LGPL-3.0-or-later. */
+body { margin:0; padding:20px; background:#f5f4fb; color:#292a40; font-family:"Segoe UI",sans-serif; font-size:13px; }
+.brand { display:flex; align-items:center; margin-bottom:24px; }
+.mark { width:40px; height:40px; border-radius:13px; background:#8975ec; color:white; text-align:center; line-height:40px; font-weight:700; font-size:22px; margin-right:12px; }
+h2 { font-size:18px; margin:0; } .sub { color:#7b7b94; margin-top:5px; font-size:12px; }
+.card { border-radius:18px; border:1px solid #e6e3f0; padding:16px; margin-bottom:14px; background:white; }
+.eyebrow { color:#8b79c9; font-size:10px; letter-spacing:1px; font-weight:700; margin-bottom:10px; }
+button { display:block; width:100%; text-align:left; border:1px solid #e6e3f0; border-radius:10px; margin:8px 0; padding:11px 13px; background:#faf9fd; color:#37334b; cursor:pointer; font-family:inherit; transition:background 140ms ease, transform 140ms ease; }
+button:hover { background:#eee9fc; } button:active { transform:translateY(1px); } button:focus { outline:2px solid #a493e9; }
+button.primary { background:#8975ec; color:white; border-color:#8975ec; }
+.status { color:#797a91; font-size:12px; line-height:1.6; }
+@media(prefers-reduced-motion:reduce) { button { transition:none; } }

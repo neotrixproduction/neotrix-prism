@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.neotrix.prism.ae" ExtensionBundleVersion="0.1.0" ExtensionBundleName="Neotrix Prism">
+ <ExtensionList><Extension Id="com.neotrix.prism.ae.panel" Version="0.1.0"/></ExtensionList>
+ <ExecutionEnvironment><HostList><Host Name="AEFT" Version="[16.0,99.9]"/></HostList><LocaleList><Locale Code="All"/></LocaleList></ExecutionEnvironment>
+ <DispatchInfoList><Extension Id="com.neotrix.prism.ae.panel"><DispatchInfo>
+ <Resources><MainPath>./index.html</MainPath><CEFCommandLine><Parameter>--enable-nodejs</Parameter></CEFCommandLine></Resources>
+ <Lifecycle><AutoVisible>true</AutoVisible></Lifecycle>
+ <UI><Type>Panel</Type><Menu>Neotrix Prism</Menu><Geometry><Size><Height>560</Height><Width>330</Width></Size></Geometry></UI>
+ </DispatchInfo></Extension></DispatchInfoList>
+</ExtensionManifest>

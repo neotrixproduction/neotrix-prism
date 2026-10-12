@@ -133,7 +133,7 @@ class Prism_AfterEffects_Functions(object):
             Response data as bytes, or None on error
         """
         HOST = '127.0.0.1'
-        PORT = 9888
+        PORT = int(os.getenv("NEOTRIX_AE_PORT", "9888"))
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
                 s.connect((HOST, PORT))
@@ -213,7 +213,7 @@ class Prism_AfterEffects_Functions(object):
         Returns:
             Project file path or basename
         """
-        cmd = "app.project.file.fsName;"
+        cmd = "app.project && app.project.file ? app.project.file.fsName : '';"
         filename = (self.sendCmd(cmd) or "".encode()).decode("utf-8")
         if path:
             return filename

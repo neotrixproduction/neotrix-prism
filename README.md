@@ -1,39 +1,72 @@
-# Prism Pipeline
+# Neotrix Prism
 
-This is the official repository of the Prism Pipeline.
+A Windows creative-project workspace built on the open-source Prism Pipeline.
+Browse existing project folders across Blender, Illustrator, Photoshop, After
+Effects and Fusion, save working versions, and connect reusable file workflows.
 
-Prism automates and simplifies the workflow of animation and VFX projects.
+The interface uses original Neotrix artwork, rounded tiles, colorful icons and
+lightweight motion inspired by the current CleanMyMac design.
 
-You can find more information on the website:
+![Neotrix workspace](docs/screenshots/home.png)
+![Working files across applications](docs/screenshots/projects.png)
+![Independent file-workflow editor](docs/screenshots/workflows.png)
 
-https://prism-pipeline.com/
+## Run on Windows
 
-This repository contains the Prism core application and the officially available open source plugins.
-Additional features and plugins are available on the Prism website.
+Download the Windows preview package from this repository's Releases, extract it
+to a stable folder, and double-click **Launch Neotrix Prism.cmd**. Python and Qt
+are included; there is no separate Python installation.
 
+Open Settings to check storage roots and application paths. Relay is the default
+shared project library. Projects are scanned in place; existing production
+folders are not migrated or renamed.
 
-## Getting Started
+Run **Install Integrations.cmd** for the separate Blender and Adobe integrations.
+Photoshop's docked UXP panel requires Adobe's UXP installer; a companion JSX can
+open the Qt workspace when that installer is unavailable.
 
-On the [website](https://prism-pipeline.com/downloads/) you can find the latest official installer.
+See [Setup](docs/SETUP.md) for opening files, version saving and shared workflows.
 
-For a getting started guide about how to use Prism see the [Documentation](https://prism-pipeline.com/docs/latest/).
+## Included
 
+- Project cards/list views, search, favorites and recent projects.
+- Application, department, variant, shot, stage and version filters.
+- Working-file and output views, existing image previews and application icons.
+- Open, Open With, Reveal Folder and Copy Path actions.
+- In-memory version saves through Blender, Photoshop and After Effects adapters.
+- An independently implemented typed graph editor: find, filter, build paths,
+  create folders, copy, open and log. Runs are manual and previewed.
+- Shared JSON workflows, edit-conflict detection, offline caches and local history.
+- Light/dark appearance, keyboard focus and a reduced-motion setting.
+- Retained Prism-managed project and production services with the Neotrix theme.
 
-## Installing
+The screenshots use fictional indexing fixtures. They are screenshots of the
+native Qt app, not browser mockups.
 
-Download the installer from the [website](https://prism-pipeline.com/downloads/)
-(This version allows you to automatically update Prism and install new plugins)
+## Preview status
 
-or to install Prism manually:
-* Download or clone this repository and download the [Prism dependencies](https://www.dropbox.com/scl/fi/bmgsht89nb9u04sqprzrp/Prism_dependencies_v2.0.5.zip?rlkey=wy0rtw56chky6kt1mnxnept0t&st=jkiho4o9&dl=1).
+Real open/save/reopen checks passed for Blender, Photoshop and After Effects;
+file-opening checks passed for Illustrator and Fusion. Desktop scaling was
+reviewed at 100%, 150% and 200%.
 
-* Extract the dependencies and copy the extracted folders into the "Prism" folder of this repository.
+The Photoshop UXP installation and the true two-workstation pilot are still
+pending. Native advanced Prism tools keep their established layouts with the
+shared Neotrix theme. See [Validation](VALIDATION.md) for evidence and limits.
 
-* Now the "Prism" folder should contain the folders like:
-"Plugins", "Python313", "PythonLibs", "Scripts", ...
+## Source and maintenance
 
-* Execute the setup.bat file to launch Prism.
+Forked from [PrismPipeline/Prism](https://github.com/PrismPipeline/Prism), pinned to
+v2.1.3, fd440de6747b7e62e2ba8cb675028e7adbbce1e3. Upstream history and license notices
+are retained. No commercial Prism plugins are included.
 
-## License
+Our graph editor does not use the official commercial Execution Graph.
+Automatic upstream replacement is disabled; upgrades are merged and tested.
 
-This project is licensed under the GNU LGPL-3.0-or-later License - see the [license-LGPL.txt](license-LGPL.txt) file for details.
+- [Development](docs/DEVELOPMENT.md)
+- [Upstream changes](UPSTREAM.md)
+- [Original upstream README](docs/UPSTREAM_README.md)
+
+Neotrix additions are LGPL-3.0-or-later. Existing components retain their
+applicable upstream licenses. Runtime third-party licenses are in the Windows
+package. User preferences, real production files and credentials are excluded
+from this repository.

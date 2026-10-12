@@ -1,4 +1,16 @@
 *.pyc
+.build-env/
+.runtime/
+/runtime/
+/integration-packages/
+/integration-install.log
+dist/
+artifacts/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+Prism/Python313/
+Prism/Python311/
 Prism/Python37/
 Prism/PythonLibs/
 Prism/Tools/
