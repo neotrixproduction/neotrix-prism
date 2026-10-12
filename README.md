@@ -10,6 +10,16 @@ CleanMyMac design. Both appearances use colored surfaces; the dark variant
 reduces brightness. Sidebar, file lists, settings and native Prism dialogs share
 the same palette.
 
+The rounded Windows shell includes custom window controls, draggable caption,
+edge resizing and a collapsible animated sidebar. The five-tile home uses
+staggered icon entrances, spring-like hover feedback, expanding tile emphasis,
+sliding navigation selection, page/detail transitions and a circular task
+progress control. Reduced motion disables the timelines.
+
+Manrope provides heading and body typography with distinct sizes and weights.
+The OFL font files and license are bundled; no font installation is required.
+See [Motion and visual reference](docs/MOTION.md).
+
 ![Neotrix workspace](docs/screenshots/home.png)
 ![Working files across applications](docs/screenshots/projects.png)
 ![Independent file-workflow editor](docs/screenshots/workflows.png)

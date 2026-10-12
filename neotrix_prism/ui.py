@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPixmap, QAction, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPushButton, QLabel, QStackedWidget, QLineEdit, QComboBox, QTableWidget, QTableWidgetItem,
@@ -14,6 +14,8 @@ from . import __version__, apps, indexer, graph
 from .storage import Settings, GraphLibrary, user_dir, atomic_json, read_json, history, activity
 from .design import icon, stylesheet, fade, palette, native_theme
 from .surfaces import Atmosphere, GradientTile, WorkspaceArt
+from .motion import MotionButton, MotionIcon, OrbButton, reveal_page, tween, enabled
+from .window_chrome import RoundedShell, Caption, ResizeFrame
 from .graph_ui import GraphEditor
 
 
@@ -44,7 +46,7 @@ def label(text, name=None, wrap=False):
 
 
 def button(text, callback, primary=False):
-    item = QPushButton(text)
+    item = MotionButton(text)
     item.setCursor(Qt.PointingHandCursor)
     if primary:
         item.setObjectName("primary")
@@ -78,20 +80,39 @@ def table(columns):
 class MainWindow(QMainWindow):
     def __init__(self, settings=None, core=None):
         super().__init__()
+        from .typography import initialize
+        initialize()
         self.settings = settings or Settings()
         self.core = core
         self.projects, self.files, self.display_files, self.jobs = [], [], [], []
         self.project, self.preview = None, None
         self.setWindowTitle("Neotrix Prism")
+        self.setObjectName("workspaceWindow")
+        self.setWindowFlags(Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinMaxButtonsHint | Qt.WindowSystemMenuHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.setWindowIcon(icon("Brand"))
         self.resize(1360, 900)
         self.setMinimumSize(1024, 720)
-        central = Atmosphere()
-        self.setCentralWidget(central)
+        shell = RoundedShell()
+        self.setCentralWidget(shell)
+        self.shell_layout = QVBoxLayout(shell)
+        self.shell_layout.setContentsMargins(8, 8, 8, 8)
+        self.shell_layout.setSpacing(0)
+        self.surface = Atmosphere()
+        self.shell_layout.addWidget(self.surface)
+        surface_layout = QVBoxLayout(self.surface)
+        surface_layout.setContentsMargins(0, 0, 0, 0)
+        surface_layout.setSpacing(0)
+        self.caption = Caption(self)
+        surface_layout.addWidget(self.caption)
+        central = QWidget()
+        surface_layout.addWidget(central, 1)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         sidebar = QWidget()
+        self.sidebar = sidebar
+        self.compact_sidebar = False
         sidebar.setObjectName("sidebar")
         sidebar.setFixedWidth(202)
         nav_layout = QVBoxLayout(sidebar)
@@ -102,7 +123,8 @@ class MainWindow(QMainWindow):
         mark.setFixedSize(37, 37)
         mark.setPixmap(icon("Brand", 37).pixmap(37, 37))
         brand.addWidget(mark)
-        brand.addWidget(label("NEOTRIX\nPrism", "section"))
+        self.brand_label = label("NEOTRIX\nPrism", "section")
+        brand.addWidget(self.brand_label)
         nav_layout.addLayout(brand)
         nav_layout.addSpacing(35)
         self.nav = {}
@@ -110,6 +132,7 @@ class MainWindow(QMainWindow):
             item = button(name, lambda checked=False, n=name: self.navigate(n))
             item.setObjectName("nav")
             item.setCheckable(True)
+            item.setToolTip(name)
             item.setIcon(icon(name, 28))
             item.setIconSize(QSize(26, 26))
             nav_layout.addWidget(item)
@@ -117,7 +140,12 @@ class MainWindow(QMainWindow):
         nav_layout.addStretch()
         self.storage_label = label("Relay\nConnecting…", "subtitle", True)
         nav_layout.addWidget(self.storage_label)
-        nav_layout.addWidget(label("Neotrix Prism " + __version__, "subtitle"))
+        self.version_label = label("Neotrix Prism " + __version__, "subtitle")
+        nav_layout.addWidget(self.version_label)
+        self.selection_rail = QFrame(sidebar)
+        self.selection_rail.setObjectName("selectionRail")
+        self.selection_rail.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.selection_rail.lower()
         layout.addWidget(sidebar)
         content = QWidget()
         body = QVBoxLayout(content)
@@ -130,7 +158,7 @@ class MainWindow(QMainWindow):
         left.addWidget(self.page_title)
         left.addWidget(self.page_subtitle)
         header.addLayout(left, 1)
-        pipeline = QPushButton("Pipeline tools")
+        pipeline = MotionButton("Pipeline tools")
         pipeline.setIcon(icon("Settings", 22))
         menu = QMenu(pipeline)
         for title, action in (("Save New Version", self.save_current_version), ("Prism managed-project browser", self.native_browser),
@@ -146,6 +174,10 @@ class MainWindow(QMainWindow):
         footer = QHBoxLayout()
         self.status = label("Ready", "subtitle")
         footer.addWidget(self.status, 1)
+        self.orb = OrbButton()
+        self.orb.clicked.connect(lambda: self.cancel_jobs() if self.jobs else self.navigate("Projects"))
+        footer.addWidget(self.orb)
+        footer.addStretch(1)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setFixedWidth(180)
@@ -163,6 +195,7 @@ class MainWindow(QMainWindow):
         self.build_activity()
         self.build_settings()
         self.apply_theme()
+        self.resize_frame = ResizeFrame(self)
         refresh = QAction(self)
         refresh.setShortcut(QKeySequence.Refresh)
         refresh.triggered.connect(self.refresh)
@@ -180,9 +213,17 @@ class MainWindow(QMainWindow):
         return layout
 
     def apply_theme(self):
+        if self.settings.data["reduced_motion"]:
+            from PySide6.QtCore import QVariantAnimation
+            for animation in self.findChildren(QVariantAnimation):
+                animation.stop()
+            for widget in self.findChildren(QWidget):
+                if widget.graphicsEffect():
+                    widget.setGraphicsEffect(None)
+            self.sidebar.setFixedWidth(78 if self.compact_sidebar else 202)
         dark = self.settings.data["theme"] == "dark"
-        self.centralWidget().dark = dark
-        self.centralWidget().update()
+        self.surface.dark = dark
+        self.surface.update()
         QApplication.instance().setPalette(palette(dark))
         self.setStyleSheet(stylesheet(dark))
         for scroll in self.findChildren(QScrollArea):
@@ -192,7 +233,53 @@ class MainWindow(QMainWindow):
         self.editor.dark = dark
         self.editor.view.viewport().update()
         for item in self.editor.items.values():
+            if self.settings.data["reduced_motion"]:
+                animation = getattr(item, "_glow", None)
+                if animation:
+                    animation.stop()
+                item.set_glow(0)
             item.update()
+        for widget in self.findChildren(MotionIcon):
+            if not enabled(widget):
+                for key in ("_hover", "_reveal"):
+                    animation = getattr(widget, key, None)
+                    if animation:
+                        animation.stop()
+                widget.set_hover(0)
+                widget.set_reveal(1)
+        self.orb.set_busy(bool(self.jobs))
+
+    def move_selection(self, name):
+        target = self.nav[name].geometry()
+        if not enabled(self) or not self.selection_rail.isVisible():
+            self.selection_rail.setGeometry(target)
+            self.selection_rail.show()
+            return
+        old = getattr(self, "_selection_motion", None)
+        if old:
+            old.stop()
+            old.deleteLater()
+        animation = QPropertyAnimation(self.selection_rail, b"geometry", self)
+        animation.setStartValue(self.selection_rail.geometry())
+        animation.setEndValue(target)
+        animation.setDuration(320)
+        animation.setEasingCurve(QEasingCurve.OutCubic)
+        self._selection_motion = animation
+        animation.start()
+
+    def toggle_sidebar(self):
+        self.compact_sidebar = not self.compact_sidebar
+        for name, item in self.nav.items():
+            item.setText("" if self.compact_sidebar else name)
+        self.brand_label.setVisible(not self.compact_sidebar)
+        self.storage_label.setVisible(not self.compact_sidebar)
+        self.version_label.setVisible(not self.compact_sidebar)
+        self.caption.collapse.setText("›" if self.compact_sidebar else "‹")
+        def step(value):
+            self.sidebar.setFixedWidth(int(value))
+            current = next((name for name, item in self.nav.items() if item.isChecked()), "Home")
+            self.selection_rail.setGeometry(self.nav[current].geometry())
+        tween(self, "_sidebar_motion", self.sidebar.width(), 78 if self.compact_sidebar else 202, step, 380)
 
     def navigate(self, name):
         titles = {"Home": ("Your creative workspace", "Everything you need to pick up where you left off."),
@@ -203,9 +290,13 @@ class MainWindow(QMainWindow):
                   "Settings": ("Make it yours", "Storage, applications and the way your workspace feels.")}
         self.page_title.setText(titles[name][0])
         self.page_subtitle.setText(titles[name][1])
+        self.page_title.setAlignment(Qt.AlignCenter if name == "Home" else Qt.AlignLeft)
+        self.page_subtitle.setAlignment(Qt.AlignCenter if name == "Home" else Qt.AlignLeft)
         for key, nav in self.nav.items():
             nav.setChecked(key == name)
         self.stack.setCurrentWidget(self.pages[name])
+        self.orb.setVisible(name == "Home" or bool(self.jobs))
+        QTimer.singleShot(0, self, lambda: self.move_selection(name))
         if name == "Activity":
             self.refresh_history()
         elif name == "Favorites":
@@ -213,68 +304,71 @@ class MainWindow(QMainWindow):
         elif name == "Workflows":
             self.editor.refresh_library()
             QTimer.singleShot(0, self.editor.fit)
-        fade(self.pages[name], self.settings.data["reduced_motion"])
+        reveal_page(self.pages[name])
+        if name == "Home":
+            for i, artwork in enumerate(self.pages[name].findChildren(MotionIcon)):
+                artwork.appear(i * 75)
 
     def build_home(self):
         outer = self.page("Home")
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         content = QWidget()
-        content.setMinimumHeight(720)
+        content.setMinimumHeight(510)
         layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(18)
         layout.setSizeConstraint(QLayout.SetMinimumSize)
         scroll.setWidget(content)
         outer.addWidget(scroll)
-        hero = GradientTile("hero")
-        hero_layout = QHBoxLayout(hero)
-        hero_layout.setContentsMargins(28, 28, 28, 28)
-        left = QVBoxLayout()
-        left.addWidget(label("NEOTRIX CREATIVE WORKSPACE", "eyebrow"))
-        left.addWidget(label("Ready for your next idea.", "title", True))
-        left.addWidget(label("Every project. Every creative tool.\nOne beautiful place to pick up where you left off.", "subtitle", True))
-        left.addSpacing(10)
-        row = QHBoxLayout()
-        row.addWidget(button("Explore projects", lambda: self.navigate("Projects"), True))
-        row.addWidget(button("Build a workflow", lambda: self.navigate("Workflows")))
-        row.addStretch()
-        left.addLayout(row)
-        hero_layout.addLayout(left, 1)
-        illustration = WorkspaceArt()
-        hero_layout.addWidget(illustration)
-        layout.addWidget(hero)
         overview = QHBoxLayout()
-        for name, title, description in (
+        for tile_index, (name, title, description) in enumerate((
             ("Projects", "All your projects", "Browse working files across every creative application."),
             ("Workflows", "Make work flow", "Collect and open files with reusable visual workflows."),
-            ("Favorites", "Your best, on hand", "Keep favorite projects and files one click away.")):
+            ("Favorites", "Your best, on hand", "Keep favorite projects and files one click away."))):
             frame = GradientTile(name)
             inner = QVBoxLayout(frame)
             inner.setContentsMargins(22, 18, 22, 20)
             inner.setSpacing(10)
             top = QHBoxLayout()
-            top.addWidget(label({"Projects": "PROJECT LIBRARY", "Workflows": "VISUAL WORKFLOWS", "Favorites": "FAVORITES"}[name], "eyebrow"), 1)
-            item = QLabel()
-            item.setFixedSize(78, 78)
-            item.setPixmap(icon(name, 78).pixmap(78, 78))
+            top.addWidget(label({"Projects": "PROJECT LIBRARY", "Workflows": "VISUAL WORKFLOWS", "Favorites": "FAVORITES"}[name], "eyebrow", True), 1)
+            item = MotionIcon(name, 112)
             top.addWidget(item)
             inner.addLayout(top)
             inner.addWidget(label(title, "section", True))
             inner.addWidget(label(description, "subtitle", True))
             inner.addStretch()
             inner.addWidget(button("Open " + name.lower(), lambda checked=False, n=name: self.navigate(n)))
-            overview.addWidget(frame, 1)
-        layout.addLayout(overview)
+            overview.addWidget(frame, 100)
+            frame.hover_changed.connect(lambda value, i=tile_index: overview.setStretch(i, int(100 + 12 * value)))
+        layout.addLayout(overview, 3)
         row = QHBoxLayout()
-        row.addWidget(label("Recently opened projects", "section"), 1)
-        row.addWidget(button("View all", lambda: self.navigate("Projects")))
-        layout.addLayout(row)
+        recent_tile = GradientTile("Recent")
+        recent_layout = QVBoxLayout(recent_tile)
+        recent_layout.setContentsMargins(22, 18, 22, 20)
+        recent_header = QHBoxLayout()
+        recent_header.addWidget(label("Pick up where you left off", "section", True), 1)
+        recent_header.addWidget(MotionIcon("Projects", 65))
+        recent_layout.addLayout(recent_header)
         self.recent_container = QWidget()
         self.recent_grid = QGridLayout(self.recent_container)
         self.recent_grid.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.recent_container)
-        layout.addStretch()
+        recent_layout.addWidget(self.recent_container)
+        recent_layout.addStretch()
+        row.addWidget(recent_tile, 3)
+        storage_tile = GradientTile("Storage")
+        storage_layout = QVBoxLayout(storage_tile)
+        storage_layout.setContentsMargins(22, 18, 22, 20)
+        storage_header = QHBoxLayout()
+        storage_header.addWidget(label("Your creative library", "section", True), 1)
+        storage_header.addWidget(MotionIcon("Activity", 85))
+        storage_layout.addLayout(storage_header)
+        self.home_storage = label("Relay · Connecting…", "subtitle", True)
+        storage_layout.addWidget(self.home_storage)
+        storage_layout.addStretch()
+        storage_layout.addWidget(button("Manage storage", lambda: self.navigate("Settings")))
+        row.addWidget(storage_tile, 2)
+        layout.addLayout(row, 2)
 
     def clear_layout(self, layout):
         while layout.count():
@@ -287,7 +381,7 @@ class MainWindow(QMainWindow):
         for i, path in enumerate(self.settings.data["recent"][:4]):
             item = button(Path(path).name + "\nContinue project  →", lambda checked=False, p=path: self.open_project(p))
             item.setObjectName("projectCard")
-            item.setMinimumHeight(90)
+            item.setMinimumHeight(68)
             item.setIcon(icon("Projects", 38))
             item.setIconSize(QSize(38, 38))
             self.recent_grid.addWidget(item, i // 2, i % 2)
@@ -361,6 +455,7 @@ class MainWindow(QMainWindow):
         self.file_table.cellDoubleClicked.connect(lambda row, col: self.open_selected())
         split.addWidget(self.file_table)
         detail, inner = card()
+        self.details_panel = detail
         detail.setMinimumWidth(220)
         detail.setMaximumWidth(280)
         self.preview_image = QLabel()
@@ -401,6 +496,8 @@ class MainWindow(QMainWindow):
         job.node.connect(self.editor.set_node_state)
         job.finished.connect(lambda: self.finished_job(job))
         self.jobs.append(job)
+        self.orb.show()
+        self.orb.set_busy(True)
         self.progress_bar.show()
         self.cancel_button.show()
         job.start()
@@ -411,6 +508,8 @@ class MainWindow(QMainWindow):
             self.jobs.remove(job)
         job.deleteLater()
         if not self.jobs:
+            self.orb.set_busy(False)
+            self.orb.setVisible(self.stack.currentWidget() == self.pages["Home"])
             self.progress_bar.hide()
             self.cancel_button.hide()
 
@@ -452,6 +551,8 @@ class MainWindow(QMainWindow):
         for path in self.projects:
             self.workflow_project.addItem(Path(path).name, path)
         self.storage_label.setText("Relay\nConnected" if result["online"] else "Storage offline\nCached projects")
+        self.home_storage.setText((f"{len(self.projects)} projects · Storage connected" if result["online"] else
+                                   "Storage offline · Cached projects") + "\nShared files and reusable workflows")
         self.status.setText(f"{len(self.projects)} projects available" + (" · Some storage unavailable" if result["errors"] else ""))
         self.render_projects()
         self.update_recent()
@@ -550,6 +651,8 @@ class MainWindow(QMainWindow):
         return self.display_files[row] if 0 <= row < len(self.display_files) else None
 
     def update_details(self):
+        if hasattr(self, "details_panel"):
+            reveal_page(self.details_panel)
         file = self.selected()
         for item in self.file_actions:
             item.setEnabled(bool(file))
@@ -924,7 +1027,38 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
+        current_project = self.workflow_project.currentData()
+        self.workflow_project.blockSignals(True)
         self.workflow_project.clear()
         self.workflow_project.addItem("Choose a project", None)
         for path in self.projects:
             self.workflow_project.addItem(Path(path).name, path)
+        if current_project:
+            self.workflow_project.setCurrentIndex(max(0, self.workflow_project.findData(current_project)))
+        self.workflow_project.blockSignals(False)
+        QTimer.singleShot(0, self, lambda: self.move_selection(next((n for n, b in self.nav.items() if b.isChecked()), "Home")))
+
+    def changeEvent(self, event):
+        from PySide6.QtCore import QEvent
+        super().changeEvent(event)
+        if event.type() == QEvent.WindowStateChange and hasattr(self, "surface"):
+            margin = 0 if self.isMaximized() else 8
+            self.shell_layout.setContentsMargins(margin, margin, margin, margin)
+            self.surface.update_shape()
+            if self.isMinimized():
+                self.orb.spin.stop()
+            else:
+                self.orb.set_busy(bool(self.jobs))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, "selection_rail"):
+            def align():
+                current = next((n for n, b in self.nav.items() if b.isChecked()), "Home")
+                self.selection_rail.setGeometry(self.nav[current].geometry())
+                for frame in self.pages["Home"].findChildren(GradientTile):
+                    if frame.tone in ("Projects", "Workflows", "Favorites"):
+                        for artwork in frame.findChildren(MotionIcon):
+                            size = 90 if self.width() <= 1150 else 112
+                            artwork.setFixedSize(size, size)
+            QTimer.singleShot(0, self, align)

@@ -1,11 +1,24 @@
 """Static, resolution-independent gradient surfaces; no repaint timer or blur layers."""
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QColor, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QPen
+from PySide6.QtCore import QRectF, Qt, QEasingCurve, Signal
+from PySide6.QtGui import QColor, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QPen, QRegion
 from PySide6.QtWidgets import QWidget, QFrame
+from .motion import tween, MotionIcon, enabled
 
 
 class Atmosphere(QWidget):
     dark = False
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update_shape()
+
+    def update_shape(self):
+        if self.window().isMaximized():
+            self.clearMask()
+        else:
+            shape = QPainterPath()
+            shape.addRoundedRect(QRectF(self.rect()), 26, 26)
+            self.setMask(QRegion(shape.toFillPolygon().toPolygon()))
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -22,16 +35,37 @@ class Atmosphere(QWidget):
 
 class GradientTile(QFrame):
     """A painted gradient stays crisp at every Windows display scale."""
+    hover_changed = Signal(float)
     TONES = {"hero": ("#8030ac", "#151344", "#d660de"),
              "Projects": ("#6440a4", "#332463", "#efb375"),
              "Workflows": ("#5143a4", "#24275d", "#54ccea"),
-             "Favorites": ("#833b9e", "#392066", "#f885c1")}
+             "Favorites": ("#833b9e", "#392066", "#f885c1"),
+             "Recent": ("#633693", "#28245f", "#8594ed"),
+             "Storage": ("#55378c", "#26225d", "#60d8c8")}
 
     def __init__(self, tone="hero"):
         super().__init__()
         self.tone = tone
+        self.hover = 0.0
         self.setObjectName("hero" if tone == "hero" else "featureTile")
         self.setAttribute(Qt.WA_StyledBackground, False)
+
+    def set_hover(self, value):
+        self.hover = float(value)
+        self.update()
+        self.hover_changed.emit(self.hover)
+
+    def enterEvent(self, event):
+        tween(self, "_hover", self.hover, 1.0, self.set_hover, 350)
+        for artwork in self.findChildren(MotionIcon):
+            artwork.engage(1.0)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        tween(self, "_hover", self.hover, 0.0, self.set_hover, 450)
+        for artwork in self.findChildren(MotionIcon):
+            artwork.engage(0.0)
+        super().leaveEvent(event)
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -45,15 +79,15 @@ class GradientTile(QFrame):
         base.setColorAt(0, QColor(first))
         base.setColorAt(1, QColor(last))
         p.fillPath(path, base)
-        glow = QRadialGradient(rect.width() * .92, rect.height() * .08, rect.width() * .63)
+        glow = QRadialGradient(rect.width() * (.92 - .12 * self.hover), rect.height() * .08, rect.width() * .63)
         glow.setColorAt(0, QColor(bloom))
         glow.setColorAt(.32, QColor(bloom).lighter(105))
         glow.setColorAt(1, QColor(100, 45, 150, 0))
-        p.setOpacity(.28 if self.tone == "hero" else .48)
+        p.setOpacity((.28 if self.tone == "hero" else .48) + .15 * self.hover)
         p.fillPath(path, glow)
         p.setOpacity(1)
         sheen = QLinearGradient(0, 0, 0, rect.height())
-        sheen.setColorAt(0, QColor(255, 255, 255, 38))
+        sheen.setColorAt(0, QColor(255, 255, 255, int(38 + 70 * self.hover)))
         sheen.setColorAt(.5, QColor(255, 255, 255, 4))
         sheen.setColorAt(1, QColor(255, 255, 255, 13))
         p.setPen(QPen(sheen, 1.5))

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, Q
     QLabel, QMessageBox, QFileDialog, QListWidget)
 from .graph import NODES, example_graph, validate
 from .storage import GraphLibrary, atomic_json
+from .motion import MotionButton, tween
 
 PORT_COLORS = {"project": "#ba91e5", "files": "#6caceb", "path": "#61bba6"}
 
@@ -18,12 +19,29 @@ class NodeItem(QGraphicsObject):
     def __init__(self, node, editor):
         super().__init__()
         self.node, self.editor, self.state = node, editor, "ready"
+        self.glow = 0.0
+        self.setAcceptHoverEvents(True)
         self.setFlags(QGraphicsItem.ItemIsMovable | QGraphicsItem.ItemIsSelectable | QGraphicsItem.ItemIsFocusable | QGraphicsItem.ItemSendsGeometryChanges)
         self.setPos(*node.get("position", [60, 60]))
         self.setToolTip(node["type"] + "\nDrag a colored output port to a matching input. Double-click to edit properties.")
 
     def boundingRect(self):
         return QRectF(0, 0, 205, 116)
+
+    def window(self):
+        return self.editor.window()
+
+    def set_glow(self, value):
+        self.glow = float(value)
+        self.update()
+
+    def hoverEnterEvent(self, event):
+        tween(self, "_glow", self.glow, 1.0, self.set_glow, 220)
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event):
+        tween(self, "_glow", self.glow, 0.0, self.set_glow, 300)
+        super().hoverLeaveEvent(event)
 
     def ports(self, direction):
         return list(NODES[self.node["type"]][direction])
@@ -39,6 +57,10 @@ class NodeItem(QGraphicsObject):
         painter.setBrush(QBrush(surface))
         painter.setPen(QPen(QColor("#e1adff" if self.isSelected() else "#9673b4"), 2 if self.isSelected() else 1))
         painter.drawRoundedRect(self.boundingRect().adjusted(1, 1, -1, -1), 15, 15)
+        if self.glow:
+            painter.setBrush(QColor(214, 162, 255, int(24 * self.glow)))
+            painter.setPen(QPen(QColor(232, 181, 255, int(160 * self.glow)), 1.5))
+            painter.drawRoundedRect(self.boundingRect().adjusted(2, 2, -2, -2), 14, 14)
         painter.setPen(QColor("#fff5ff"))
         font = painter.font()
         font.setBold(True)
@@ -200,7 +222,7 @@ class GraphEditor(QWidget):
         self.mutation_buttons = []
         for title, callback in (("New", self.new_graph), ("Add node", self.add_node), ("Remove", self.remove_selected), ("Save", self.save), ("Save as", self.save_as),
                                 ("Import", self.import_graph), ("Export", self.export_graph), ("Fit", self.fit)):
-            button = QPushButton(title)
+            button = MotionButton(title)
             button.clicked.connect(callback)
             toolbar.addWidget(button)
             if title not in ("Fit", "Export"):
@@ -218,7 +240,7 @@ class GraphEditor(QWidget):
         self.library_list = QListWidget()
         self.library_list.itemDoubleClicked.connect(self.load_item)
         side_layout.addWidget(self.library_list)
-        refresh = QPushButton("Refresh library")
+        refresh = MotionButton("Refresh library")
         refresh.clicked.connect(self.refresh_library)
         side_layout.addWidget(refresh)
         side_layout.addWidget(QLabel("Node properties"))
@@ -228,7 +250,7 @@ class GraphEditor(QWidget):
         self.hint = QLabel("Drag matching colored ports to connect.\nDouble-click a node to edit.\nScroll to zoom • middle-drag to pan.")
         self.hint.setWordWrap(True)
         side_layout.addWidget(self.hint)
-        self.run_button = QPushButton("Preview workflow")
+        self.run_button = MotionButton("Preview workflow")
         self.run_button.setObjectName("primary")
         self.run_button.clicked.connect(self.request_preview)
         side_layout.addWidget(self.run_button)

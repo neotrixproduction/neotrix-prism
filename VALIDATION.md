@@ -1,4 +1,4 @@
-# Validation — Neotrix Prism 0.1.2 preview
+# Validation — Neotrix Prism 0.2.0 preview
 
 ## Verified on this workstation
 
@@ -43,6 +43,21 @@
   including placeholders and disabled text.
 - All 18 tests pass. Native captures cover all six desktop pages at 100%, 150%
   and 200%, both appearances, reduced motion and the minimum window size.
+
+## 0.2.0 animation and rounded window
+
+- 24 automated tests pass, including interrupted page transitions, sidebar
+  collapse/expand, maximize/restore masks, caption dragging, resize constraints,
+  circular worker cancellation and reduced-motion behavior.
+- Live Windows QA verified pointer caption drag (position changed by 80 x 40),
+  right-edge resize (1280 to 1224 px), maximize and restore.
+- Bundled Manrope resolves to the expected actual font family for headings,
+  body and controls, following the user's final typography choice.
+- Real Qt interaction frames were recorded for the motion preview. QA task
+  progress is explicitly labeled as a fixture. No production files are modified.
+- Desktop static captures cover all six pages, both appearances, 100%, 150% and
+  200%, reduced motion and the minimum window size.
+- Adobe panel animation sources were updated; live host rendering is pending.
 
 ## Remaining host/environment checks
 

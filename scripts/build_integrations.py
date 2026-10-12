@@ -12,6 +12,7 @@ def build(destination):
     for app in ("photoshop", "aftereffects"):
         shutil.copytree(ROOT / "integrations" / app, target / app, dirs_exist_ok=True)
         shutil.copy2(ROOT / "integrations" / "panel.css", target / app / "panel.css")
+        shutil.copytree(ROOT / "assets/fonts", target / app / "fonts", dirs_exist_ok=True)
     ae = target / "aftereffects"
     (ae / "CSXS").mkdir(exist_ok=True)
     shutil.copy2(ae / "manifest.xml", ae / "CSXS" / "manifest.xml")

@@ -56,10 +56,14 @@ def theme_tokens(dark=False):
 
 
 def stylesheet(dark=False):
+    from .typography import roles
+    display_font, text_font = roles()
     bg, card, text, muted, edge, selected = theme_tokens(dark)
     return """
-    QWidget {color: TEXT; font-family: 'Segoe UI'; font-size: 13px;}
+    QWidget {color: TEXT; font-family: 'FONT_TEXT'; font-size: 13px;}
     QMainWindow, QDialog {background: BG;}
+    QMainWindow#workspaceWindow {background:transparent;}
+    QWidget#caption {background:transparent;}
     QWidget#sidebar {background:rgba(27,10,58,45); border-right:1px solid rgba(255,255,255,24);}
     QFrame#card {background:qlineargradient(x1:0,y1:0,x2:.8,y2:1,stop:0 CARD,stop:1 BG); border:1px solid rgba(255,255,255,35); border-radius:20px;}
     QFrame#hero, QFrame#featureTile {background:transparent; border:none;}
@@ -71,9 +75,9 @@ def stylesheet(dark=False):
     QFrame#hero QPushButton, QFrame#featureTile QPushButton {background:rgba(255,255,255,22); color:white; border:1px solid rgba(255,255,255,35);}
     QFrame#hero QPushButton:hover, QFrame#featureTile QPushButton:hover {background:rgba(255,255,255,42); border-color:rgba(255,255,255,75);}
     QFrame#hero QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #d25bdd,stop:1 #8c37bb);color:white;border:1px solid #df8fec;}
-    QLabel#title {font-size:30px; font-weight:600; letter-spacing:-1px;}
+    QLabel#title {font-family:'FONT_DISPLAY';font-size:30px; font-weight:500; letter-spacing:-1px;}
     QLabel#subtitle {color:MUTED; font-size:14px;}
-    QLabel#section {font-size:18px; font-weight:600;}
+    QLabel#section {font-family:'FONT_DISPLAY';font-size:18px; font-weight:600;}
     QLabel#eyebrow {color:#e2b7f4; font-size:11px; font-weight:700; letter-spacing:2px;}
     QPushButton {background:CARD; border:1px solid EDGE; border-radius:10px; padding:9px 15px; font-weight:550;}
     QPushButton:hover {background:SELECTED; border-color:#c2b6ec;}
@@ -83,8 +87,9 @@ def stylesheet(dark=False):
     QPushButton#primary:hover {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #c16ade,stop:1 #7550ba);}
     QPushButton#primary:disabled {background:#624575; color:#d3c4e3;}
     QPushButton#nav {text-align:left; border:none; padding:12px; border-radius:12px; background:transparent;}
-    QPushButton#nav:checked {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ac61d0,stop:1 #7044ae); color:white; border:1px solid #bb87d8;}
-    QPushButton#nav:hover {background:SELECTED;}
+    QPushButton#nav:checked {background:transparent; color:white; border:none;}
+    QPushButton#nav:hover {background:rgba(255,255,255,20);}
+    QFrame#selectionRail {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ac61d0,stop:1 #7044ae);border:1px solid #bb87d8;border-radius:12px;}
     QPushButton#projectCard {text-align:left; padding:20px; background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 CARD,stop:1 BG); border:1px solid EDGE; border-radius:20px; font-size:16px;}
     QPushButton#projectCard:hover {background:SELECTED;border-color:#b79bd8;}
     QPushButton:disabled {color:MUTED; background:BG;}
@@ -115,7 +120,7 @@ def stylesheet(dark=False):
     QToolTip {background:CARD; color:TEXT; border:1px solid EDGE; padding:8px;}
     QCheckBox {spacing:8px;}
     QStatusBar {background:BG; color:MUTED; border:none;}
-    """.replace("SELECTED", selected).replace("MUTED", muted).replace("TEXT", text).replace("EDGE", edge).replace("CARD", card).replace("BG", bg)
+    """.replace("FONT_DISPLAY", display_font).replace("FONT_TEXT", text_font).replace("SELECTED", selected).replace("MUTED", muted).replace("TEXT", text).replace("EDGE", edge).replace("CARD", card).replace("BG", bg)
 
 
 def palette(dark=False):
