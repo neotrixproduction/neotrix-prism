@@ -27,7 +27,7 @@ CleanMyMac's source animation system.
 | Dimensional icons | 600 ms spring entrance, 90 ms stagger; larger lift/rotation with pointer parallax and contact shadow |
 | Buttons | Hover, press/release spring and finite 580 ms click ripple |
 | Graph nodes | 220–300 ms hover outline/glow |
-| Circular action | 520 ms task state spring; changing arc length and counter-rotating secondary ring during a real worker |
+| Circular action | Fixed center across Explore/Stop states; 520 ms state spring, changing arc length and counter-rotating secondary ring during a real worker |
 | Adobe panels | Overshoot entrance, perspective card lift, finite highlight sweep, button press and icon tilt |
 
 Finite timelines stop at rest. Task rotation stops after completion/cancellation,

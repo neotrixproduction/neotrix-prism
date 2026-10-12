@@ -78,6 +78,14 @@
   real task progress loops. Adobe CSS adds a finite sweep and perspective hover;
   this revision's live Adobe panel rendering remains pending.
 
+## 0.3.1 fixed task-action position
+
+- 26 tests pass. The action orb occupies a fixed center column with equally
+  flexible side columns and a constant-height footer. Status text wraps;
+  progress and Cancel controls cannot change the orb's anchor.
+- The regression check compares the exact center coordinates before, during
+  and after a canceled task, with long status text at 1360 x 900 and 1024 x 720.
+
 ## Remaining host/environment checks
 
 - A true two-workstation pilot has not been run. The SMB concurrency test used

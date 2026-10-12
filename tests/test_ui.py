@@ -218,3 +218,22 @@ def test_tile_scene_transition_interrupt_and_reduce(window):
     assert all(a.state() == QAbstractAnimation.Stopped for a in window.findChildren(QVariantAnimation))
     assert window.stack.currentWidget() is window.pages['Settings']
     assert not messages
+
+
+def test_task_orb_position_is_fixed(window):
+    window, project, messages, wait = window
+    window.settings.data['reduced_motion'] = False
+    for size in ((1360,900),(1024,720)):
+        window.resize(*size)
+        window.navigate('Home')
+        QTest.qWait(450)
+        anchor = window.orb.mapTo(window, QPoint(42,42))
+        window.worker(lambda task: task.cancel.wait(3), lambda result: None)
+        window.status.setText('Long operation status with a full creative project path and detailed progress information')
+        QTest.qWait(100)
+        assert window.orb.mapTo(window,QPoint(42,42)) == anchor
+        QTest.mouseClick(window.orb,Qt.LeftButton)
+        wait()
+        QTest.qWait(100)
+        assert window.orb.mapTo(window,QPoint(42,42)) == anchor
+    assert not messages
