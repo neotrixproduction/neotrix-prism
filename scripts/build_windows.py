@@ -45,7 +45,7 @@ def main():
     archive = ROOT / "dist" / (PACKAGE.name + ".zip")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=5) as package:
         for file in PACKAGE.rglob("*"):
-            if file.is_file():
+            if file.is_file() and '__pycache__' not in file.parts and file.suffix.lower() != '.pyc':
                 package.write(file, Path(PACKAGE.name) / file.relative_to(PACKAGE))
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_suffix(".sha256").write_text(checksum + "  " + archive.name + "\n")
