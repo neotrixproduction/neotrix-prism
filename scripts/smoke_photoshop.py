@@ -30,12 +30,19 @@ try:
     def save(path):
         core.appPlugin.saveScene(core, path)
         return Path(path).is_file()
-    destination = save_next(source, save)
+    from neotrix_prism.project_metadata import StageStore
+    from neotrix_prism.integration import save_version_dialog
+    from PySide6.QtWidgets import QMessageBox
+    store=StageStore(directory)
+    store.save([source],'compositing',store.load()['fingerprint'])
+    QMessageBox.question=lambda *args:QMessageBox.Save
+    destination = save_version_dialog(core, expected_source=str(source))
+    assert destination and store.load()['assignments'][destination.name]=='compositing'
     document.Close(2)
     document = ps.Open(str(destination))
     assert any(document.ArtLayers.Item(i).Name == "Unsaved Neotrix QA layer" for i in range(1, document.ArtLayers.Count + 1))
     (directory / "result.json").write_text(json.dumps({"application": ps.Version, "saved": destination.name,
-        "unsaved_changes_preserved": True, "reopened": True}, indent=2))
+        "unsaved_changes_preserved": True, "reopened": True, "stage_inherited":True}, indent=2))
     print("NEOTRIX_PHOTOSHOP_SAVE_REOPEN_PASS", destination.name)
 finally:
     if document:

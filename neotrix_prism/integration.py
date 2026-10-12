@@ -122,7 +122,15 @@ def save_version_dialog(core, parent=None, expected_source=None):
                 return False
             actual = core.appPlugin.getCurrentFileName(core)
             return bool(actual and os.path.normcase(os.path.abspath(actual)) == os.path.normcase(os.path.abspath(path)))
+        from .project_metadata import inheritance_snapshot
+        inheritance = inheritance_snapshot(current, getattr(parent,'project',None))
         saved = save_next(current, adapter, expected=destination)
+        if inheritance:
+            store, expected, stage = inheritance
+            try:
+                store.save([saved],stage,expected)
+            except Exception as exc:
+                QMessageBox.warning(parent, 'Stage label', 'The document was saved successfully, but its stage label could not be inherited.\n'+str(exc))
         if parent and getattr(parent, "project", None):
             parent.refresh()
         return saved

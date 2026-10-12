@@ -2,18 +2,17 @@
 
 A Windows creative-project workspace built on the open-source Prism Pipeline.
 Browse existing project folders across Blender, Illustrator, Photoshop, After
-Effects and Fusion, save working versions, and connect reusable file workflows.
+Effects and Fusion, save working versions, and organize files with shared stage labels.
 
 The interface uses a continuous purple-to-indigo background, luminous tinted
 tiles, dimensional original icons and choreographed motion inspired by the current
 CleanMyMac design. Both appearances use colored surfaces; the dark variant
 reduces brightness. Sidebar, file lists, settings and native Prism dialogs share
-the same palette. Projects use a perspective card shelf with fading edges;
-working files use an animated card gallery instead of tables. Scroll, drag or
-use arrow keys to browse. Scrollbars are hidden across Neotrix surfaces.
+the same palette. Projects use uniformly spaced cards, followed by named-version and stage cards,
+then a native-resolution file list. Scroll, drag or use arrow keys to browse. Scrollbars are hidden across Neotrix surfaces.
 
 The rounded Windows shell includes custom window controls, draggable caption,
-edge resizing and a collapsible animated sidebar. The five-tile home uses
+edge resizing and a collapsible animated sidebar. The home uses
 staggered card/icon entrances, spring-driven tile expansion, pointer parallax,
 reactive lighting, highlight sweeps and click ripples. Opening a home tile reveals
 its destination through a growing rounded surface; sidebar navigation uses
@@ -33,8 +32,8 @@ not mesh models. Existing preview images are used without launching applications
 
 ![Neotrix workspace](docs/screenshots/home.png)
 ![Working files across applications](docs/screenshots/projects.png)
-![Perspective project shelf](docs/screenshots/project-library.png)
-![Independent file-workflow editor](docs/screenshots/workflows.png)
+![Uniform project grid](docs/screenshots/project-library.png)
+![Production stage cards](docs/screenshots/stages.png)
 
 ## Run on Windows
 
@@ -50,18 +49,16 @@ Run **Install Integrations.cmd** for the separate Blender and Adobe integrations
 Photoshop's docked UXP panel requires Adobe's UXP installer; a companion JSX can
 open the Qt workspace when that installer is unavailable.
 
-See [Setup](docs/SETUP.md) for opening files, version saving and shared workflows.
+See [Setup](docs/SETUP.md) for project icons, stage labels, opening files and version saving.
 
 ## Included
 
-- Perspective project cards, a virtualized file gallery, search, favorites and recent projects.
-- Application, department, variant, shot, stage and version filters.
-- Working-file and output views, existing image previews and application icons.
-- Open, Open With, Reveal Folder and Copy Path actions.
+- Uniform project cards, named campaign versions, 3D stage cards and a multi-selection file list.
+- Per-project artwork loaded asynchronously from `_TOOLS/icon`, with cached fallback.
+- Shared stage labels with concurrent-edit protection and offline browsing.
+- Application, department, shot and save-revision filters; working files and outputs.
+- Open, Open With, Reveal Folder, Copy Path, favorites and recent projects.
 - In-memory version saves through Blender, Photoshop and After Effects adapters.
-- An independently implemented typed graph editor: find, filter, build paths,
-  create folders, copy, open and log. Runs are manual and previewed.
-- Shared JSON workflows, edit-conflict detection, offline caches and local history.
 - Light/dark appearance, keyboard focus and a reduced-motion setting.
 - Retained Prism-managed project and production services with the Neotrix theme.
 
@@ -84,7 +81,7 @@ Forked from [PrismPipeline/Prism](https://github.com/PrismPipeline/Prism), pinne
 v2.1.3, fd440de6747b7e62e2ba8cb675028e7adbbce1e3. Upstream history and license notices
 are retained. No commercial Prism plugins are included.
 
-Our graph editor does not use the official commercial Execution Graph.
+The independent Workflows feature is removed from this release. Existing shared graph documents are preserved.
 Automatic upstream replacement is disabled; upgrades are merged and tested.
 
 - [Development](docs/DEVELOPMENT.md)

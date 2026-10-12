@@ -59,3 +59,23 @@ def test_selected_file_requires_same_active_document(tmp_path, monkeypatch):
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[2]))
     assert save_version_dialog(core, expected_source=str(source)) is None
     assert not adapter.saved and warnings
+
+
+def test_save_inherits_shared_stage_only_after_success(tmp_path, monkeypatch):
+    from neotrix_prism.project_metadata import StageStore
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setenv('NEOTRIX_USER_DIR',str(tmp_path/'prefs'))
+    source=tmp_path/'Shot_v001.psd';source.write_bytes(b'disk state')
+    store=StageStore(tmp_path)
+    store.save([source],'lighting',None)
+    adapter=Adapter(str(source))
+    core=SimpleNamespace(appPlugin=adapter,requestedApp='Photoshop')
+    monkeypatch.setattr(QMessageBox,'question',lambda *args:QMessageBox.Save)
+    saved=save_version_dialog(core)
+    assert store.load()['assignments'][saved.name]=='lighting'
+    adapter.saveScene=lambda *args:False
+    warnings=[]
+    monkeypatch.setattr(QMessageBox,'warning',lambda *args:warnings.append(args[2]))
+    assert save_version_dialog(core) is None
+    assert 'Shot_v003.psd' not in store.load()['assignments']
+    assert warnings

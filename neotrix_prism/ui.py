@@ -5,18 +5,19 @@ import threading
 import time
 from pathlib import Path
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect, QPoint
-from PySide6.QtGui import QPixmap, QAction, QKeySequence
+from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPushButton, QLabel, QStackedWidget, QLineEdit, QComboBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QSplitter, QScrollArea, QProgressBar, QMessageBox, QFileDialog,
     QPlainTextEdit, QCheckBox, QFormLayout, QDialog, QDialogButtonBox, QMenu, QLayout, QSizePolicy, QAbstractScrollArea)
-from . import __version__, apps, indexer, graph
-from .storage import Settings, GraphLibrary, user_dir, atomic_json, read_json, history, activity
+from . import __version__, apps, indexer
+from .storage import Settings, user_dir, atomic_json, read_json, history, activity
 from .design import icon, stylesheet, fade, palette, native_theme
 from .surfaces import Atmosphere, GradientTile, WorkspaceArt
 from .motion import MotionButton, MotionIcon, OrbButton, SceneTransition, reveal_page, tween, enabled
 from .window_chrome import RoundedShell, Caption, ResizeFrame
-from .graph_ui import GraphEditor
+from .project_browser import GridCards, FileList, ProjectArtwork
+from .project_metadata import StageStore, STAGES
 from .cards import CardSurface, round_surface
 
 
@@ -129,7 +130,7 @@ class MainWindow(QMainWindow):
         nav_layout.addLayout(brand)
         nav_layout.addSpacing(35)
         self.nav = {}
-        for name in ("Home", "Projects", "Favorites", "Workflows", "Activity", "Settings"):
+        for name in ("Home", "Projects", "Favorites", "Activity", "Settings"):
             item = button(name, lambda checked=False, n=name: self.navigate(n))
             item.setObjectName("nav")
             item.setCheckable(True)
@@ -207,7 +208,6 @@ class MainWindow(QMainWindow):
         self.build_home()
         self.build_projects()
         self.build_favorites()
-        self.build_workflows()
         self.build_activity()
         self.build_settings()
         self.apply_theme()
@@ -216,6 +216,10 @@ class MainWindow(QMainWindow):
         refresh.setShortcut(QKeySequence.Refresh)
         refresh.triggered.connect(self.refresh)
         self.addAction(refresh)
+        back = QAction(self)
+        back.setShortcut(QKeySequence('Alt+Left'))
+        back.triggered.connect(self.browse_back)
+        self.addAction(back)
         self.navigate("Home")
         self.load_projects()
 
@@ -257,20 +261,11 @@ class MainWindow(QMainWindow):
             round_surface(scroll.viewport())
         for menu in self.findChildren(QMenu):
             round_surface(menu)
-        self.editor.dark = dark
         for surface in self.findChildren(CardSurface):
             if self.settings.data['reduced_motion']:
                 surface.hover=0
                 surface.advance(surface.target)
             surface.update()
-        self.editor.view.viewport().update()
-        for item in self.editor.items.values():
-            if self.settings.data["reduced_motion"]:
-                animation = getattr(item, "_glow", None)
-                if animation:
-                    animation.stop()
-                item.set_glow(0)
-            item.update()
         for widget in self.findChildren(MotionIcon):
             if not enabled(widget):
                 for key in ("_hover", "_reveal"):
@@ -325,8 +320,7 @@ class MainWindow(QMainWindow):
         titles = {"Home": ("Your creative workspace", "Everything you need to pick up where you left off."),
                   "Projects": ("Projects", "Find the right project. Open the right version."),
                   "Favorites": ("Your favorites", "The projects and files you keep close."),
-                  "Workflows": ("Make work flow", "Connect simple steps. Preview changes. Run when you're ready."),
-                  "Activity": ("Your activity", "A clear record of files opened, versions saved and workflows run."),
+                  "Activity": ("Your activity", "A clear record of files opened and versions saved."),
                   "Settings": ("Make it yours", "Storage, applications and the way your workspace feels.")}
         self.page_title.setText(titles[name][0])
         self.page_subtitle.setText(titles[name][1])
@@ -342,9 +336,6 @@ class MainWindow(QMainWindow):
             self.refresh_history()
         elif name == "Favorites":
             self.refresh_favorites()
-        elif name == "Workflows":
-            self.editor.refresh_library()
-            QTimer.singleShot(0, self.editor.fit)
         self.pages[name].setGraphicsEffect(None)
         if outgoing is not None:
             self._scene_transition = SceneTransition(self.stack, outgoing, origin, direction)
@@ -377,14 +368,13 @@ class MainWindow(QMainWindow):
         overview = QHBoxLayout()
         for tile_index, (name, title, description) in enumerate((
             ("Projects", "All your projects", "Browse working files across every creative application."),
-            ("Workflows", "Make work flow", "Collect and open files with reusable visual workflows."),
             ("Favorites", "Your best, on hand", "Keep favorite projects and files one click away."))):
             frame = GradientTile(name)
             inner = QVBoxLayout(frame)
             inner.setContentsMargins(22, 18, 22, 20)
             inner.setSpacing(10)
             top = QHBoxLayout()
-            top.addWidget(label({"Projects": "PROJECT LIBRARY", "Workflows": "VISUAL WORKFLOWS", "Favorites": "FAVORITES"}[name], "eyebrow", True), 1)
+            top.addWidget(label({"Projects": "PROJECT LIBRARY", "Favorites": "FAVORITES"}[name], "eyebrow", True), 1)
             item = MotionIcon(name, 112)
             top.addWidget(item)
             inner.addLayout(top)
@@ -435,7 +425,7 @@ class MainWindow(QMainWindow):
             item = button(Path(path).name + "\nContinue project  →", lambda checked=False, p=path: self.open_project(p))
             item.setObjectName("projectCard")
             item.setMinimumHeight(68)
-            item.setIcon(icon("Projects", 38))
+            item.setIcon(QIcon(self.artwork.request(path)) if hasattr(self,'artwork') else icon("Projects",38))
             item.setIconSize(QSize(38, 38))
             self.recent_grid.addWidget(item, i // 2, i % 2)
         if not self.settings.data["recent"]:
@@ -453,21 +443,17 @@ class MainWindow(QMainWindow):
         self.project_picker.activated.connect(lambda i: self.open_project(self.project_picker.itemData(i)))
         project_controls.addWidget(self.project_picker)
         project_controls.addWidget(button("Browse projects", self.browse_projects))
+        project_controls.addWidget(button("‹ Back", self.browse_back))
         project_controls.addWidget(button("Refresh", self.refresh))
         layout.addLayout(project_controls)
         self.project_views = QWidget()
         shelf_layout = QVBoxLayout(self.project_views)
         shelf_layout.setContentsMargins(0,0,0,0)
-        self.project_cards = CardSurface(shelf=True)
+        self.artwork = ProjectArtwork(self)
+        self.artwork.changed.connect(self.project_artwork_loaded)
+        self.project_cards = GridCards()
         self.project_cards.activated.connect(lambda index: self.open_project(self.filtered_projects[index]))
         shelf_layout.addWidget(self.project_cards,1)
-        shelf_controls = QHBoxLayout()
-        shelf_controls.addWidget(button('‹',lambda: self.project_cards.selectRow(max(0,round(self.project_cards.target)-1))))
-        shelf_controls.addStretch()
-        shelf_controls.addWidget(label('Scroll or drag · Arrow keys to browse · Enter to open', 'subtitle'))
-        shelf_controls.addStretch()
-        shelf_controls.addWidget(button('›',lambda: self.project_cards.selectRow(min(len(self.filtered_projects)-1,round(self.project_cards.target)+1))))
-        shelf_layout.addLayout(shelf_controls)
         self.project_views.setMinimumHeight(245)
         layout.addWidget(self.project_views,1)
         self.work_panel = QWidget()
@@ -477,8 +463,19 @@ class MainWindow(QMainWindow):
         layout.setSpacing(16)
         self.work_panel.hide()
         self.breadcrumb = label("Select a project to explore its working files.", "subtitle")
-        self.breadcrumb.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.breadcrumb.setTextFormat(Qt.RichText)
+        self.breadcrumb.linkActivated.connect(self.breadcrumb_clicked)
+        self.breadcrumb.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.breadcrumb.setFocusPolicy(Qt.StrongFocus)
         layout.addWidget(self.breadcrumb)
+        self.choice_cards = GridCards()
+        self.choice_cards.card_height = 216
+        self.choice_cards.activated.connect(self.choice_selected)
+        layout.addWidget(self.choice_cards,1)
+        self.file_controls = QWidget()
+        controls_layout = QVBoxLayout(self.file_controls)
+        controls_layout.setContentsMargins(0,0,0,0)
+        layout.addWidget(self.file_controls)
         row = QHBoxLayout()
         self.file_search = QLineEdit()
         self.file_search.setPlaceholderText("Search filenames, shots or paths")
@@ -496,17 +493,18 @@ class MainWindow(QMainWindow):
             combo.currentIndexChanged.connect(self.filter_files)
             row.addWidget(combo)
             self.filters[key] = combo
-        layout.addLayout(row)
+        controls_layout.addLayout(row)
         row = QHBoxLayout()
-        for key, title in (("variant", "All variants"), ("shot", "All shots"), ("stage", "All stages"), ("version", "All versions")):
+        for key, title in (("shot", "All shots"), ("version", "All save revisions")):
             combo = QComboBox()
             combo.addItem(title, "")
             combo.currentIndexChanged.connect(self.filter_files)
             row.addWidget(combo, 1)
             self.filters[key] = combo
-        layout.addLayout(row)
+        controls_layout.addLayout(row)
         split = QSplitter()
-        self.file_cards = CardSurface()
+        self.file_split = split
+        self.file_cards = FileList()
         self.file_cards.selection_changed.connect(self.update_details)
         self.file_cards.activated.connect(lambda index: self.open_selected())
         split.addWidget(self.file_cards)
@@ -522,17 +520,13 @@ class MainWindow(QMainWindow):
         inner.addWidget(self.preview_image)
         self.detail_name = label("Select a working file", "section", True)
         inner.addWidget(self.detail_name)
-        self.detail_info = label("Its details and actions will appear here.", "subtitle", True)
-        self.detail_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        metadata = QWidget()
-        metadata_layout=QVBoxLayout(metadata)
-        metadata_layout.setContentsMargins(6,6,6,6)
-        metadata_layout.addWidget(self.detail_info)
-        metadata_scroll=QScrollArea()
-        metadata_scroll.setWidgetResizable(True)
-        metadata_scroll.setMinimumHeight(24)
-        metadata_scroll.setWidget(metadata)
-        inner.addWidget(metadata_scroll,1)
+        from PySide6.QtGui import QTextOption
+        self.detail_info = QPlainTextEdit('Its details and actions will appear here.')
+        self.detail_info.setReadOnly(True)
+        self.detail_info.setWordWrapMode(QTextOption.WrapAnywhere)
+        self.detail_info.setMinimumHeight(40)
+        self.detail_info.setStyleSheet('background: transparent; color: #e2cfee; border: none; padding: 6px;')
+        inner.addWidget(self.detail_info,1)
         self.file_actions = []
         action_row=QHBoxLayout()
         action_row.setSpacing(6)
@@ -544,8 +538,9 @@ class MainWindow(QMainWindow):
                                          ("Reveal in Explorer", self.reveal_selected, False), ("Copy path", self.copy_selected, False),
                                          ("Favorite file", self.favorite_selected, False))):
             if index in (0,2):
-                item = button('Open file' if index==0 else 'Save\nversion',callback,primary)
+                item = button('Open file' if index==0 else 'Save version',callback,primary)
                 item.setMinimumHeight(44)
+                item.setStyleSheet('padding: 8px 6px; font-size: 12px;')
                 item.setAccessibleName(text)
                 item.setToolTip(text)
                 action_row.addWidget(item,1)
@@ -560,12 +555,126 @@ class MainWindow(QMainWindow):
         split.addWidget(detail)
         split.setStretchFactor(0, 1)
         layout.addWidget(split, 1)
+        self.assign_button = button("Assign stage…", self.assign_stage)
+        row.addWidget(self.assign_button)
         self.update_details()
 
     def browse_projects(self):
         self.project_views.show()
         self.work_panel.hide()
         self.project_cards.setFocus()
+
+    @staticmethod
+    def variant_of(file):
+        value = file.get('variant','Unspecified')
+        return 'General' if value in ('Unspecified','') else value
+
+    def browse_back(self):
+        if not self.work_panel.isVisible():return
+        if self.browse_step=='files':
+            self.breadcrumb_clicked('stages')
+        elif self.browse_step=='stages' and any(self.variant_of(f)!='General' for f in self.files):
+            self.breadcrumb_clicked('versions')
+        else:self.browse_projects()
+
+    def breadcrumb_clicked(self, target):
+        if target == 'projects':
+            self.browse_projects()
+            return
+        if target == 'versions':
+            self.selected_variant = self.selected_stage = None
+            self.browse_step = 'versions'
+        elif target == 'stages':
+            self.selected_stage = None
+            self.browse_step = 'stages'
+        self.filter_files()
+
+    def update_browser(self):
+        if not self.project:
+            return
+        import html
+        variants = sorted({self.variant_of(f) for f in self.files},key=indexer.natural)
+        if self.selected_variant is not None and self.selected_variant not in variants and not self.scan_pending:
+            self.selected_variant = self.selected_stage = None
+            self.browse_step = 'versions'
+        named = any(v != 'General' for v in variants)
+        if self.browse_step == 'versions' and not named and (self.files or not self.scan_pending):
+            self.browse_step = 'stages'
+        file_mode = self.browse_step == 'files'
+        self.choice_cards.setVisible(not file_mode)
+        self.file_controls.setVisible(file_mode)
+        self.file_split.setVisible(file_mode)
+        crumbs = '<a href="projects" style="color:#f3dcff">Projects</a>  ›  '
+        crumbs += '<a href="versions" style="color:#f3dcff">'+html.escape(Path(self.project).name)+'</a>'
+        if self.selected_variant is not None:
+            crumbs += '  ›  <a href="stages" style="color:#f3dcff">'+html.escape(self.selected_variant)+'</a>'
+        elif self.browse_step != 'versions':
+            crumbs += '  ›  <a href="stages" style="color:#f3dcff">Stages</a>'
+        if self.selected_stage is not None:
+            crumbs += '  ›  '+STAGES[self.selected_stage]
+        self.breadcrumb.setText(crumbs)
+        if self.browse_step == 'versions':
+            entries = [{'name':v,'path':v,'application':'VERSION','subtitle':f"{sum(self.variant_of(f)==v for f in self.files)} files · Choose version →"} for v in variants]
+            self.choice_cards.empty_message = 'Discovering project versions…' if self.scan_pending else 'No working files found in this project.'
+        elif self.browse_step == 'stages':
+            scoped = [f for f in self.files if self.selected_variant is None or self.variant_of(f)==self.selected_variant]
+            entries = []
+            for key,title in STAGES.items():
+                count=sum(self.stage_store.stage(f,self.stage_document)==key for f in scoped)
+                artwork=Path(__file__).resolve().parents[1]/'assets/stage-icons'/(key+'.png')
+                entries.append({'name':title,'path':key,'application':'STAGE',
+                    'artwork':str(artwork) if artwork.is_file() else None,
+                    'subtitle':f'{count} files · Choose stage →'})
+        else:
+            entries=[]
+        self.choice_cards.set_entries(entries)
+
+    def choice_selected(self,index):
+        entries=self.choice_cards.entries
+        if not 0<=index<len(entries):return
+        if self.browse_step == 'versions':
+            self.selected_variant=entries[index]['path']
+            self.selected_stage=None
+            self.browse_step='stages'
+        else:
+            self.selected_stage=entries[index]['path']
+            self.browse_step='files'
+        self.file_search.clear()
+        self.filter_files()
+        reveal_page(self.choice_cards if self.browse_step=='stages' else self.file_split)
+
+    def assign_stage(self):
+        files=self.file_cards.selected_files()
+        if not files or not self.stage_document.get('writable',False):return
+        dialog=QDialog(self)
+        dialog.setWindowTitle('Assign production stage')
+        layout=QVBoxLayout(dialog)
+        layout.addWidget(label(f'Assign a stage to {len(files)} selected file(s).','section'))
+        combo=QComboBox()
+        for key,title in STAGES.items():combo.addItem(title,key)
+        combo.setCurrentIndex(combo.findData(self.stage_store.stage(files[0],self.stage_document)))
+        layout.addWidget(combo)
+        layout.addWidget(label('Files stay in their existing folders. Labels are shared with the project team.','subtitle',True))
+        buttons=QDialogButtonBox(QDialogButtonBox.Save|QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dialog.accept);buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        if dialog.exec()!=QDialog.Accepted:return
+        self.apply_stage(files,combo.currentData())
+
+    def apply_stage(self,files,stage):
+        store=self.stage_store;project=self.project;expected=self.stage_document.get('fingerprint')
+        def saved(document):
+            if self.project!=project:return
+            self.stage_document=document
+            self.filter_files()
+            self.status.setText(f'{len(files)} files assigned to {STAGES[stage]}')
+            activity('Stage assigned',path=project,stage=stage,count=len(files))
+        def failed(message):
+            if self.project==project:
+                self.stage_document={**self.stage_document,'writable':False}
+                self.update_details()
+            self.error(message+'\nRefresh the project before assigning again. Check write access to its _TOOLS folder.')
+        self.worker(lambda job:store.save([f['path'] for f in files],stage,expected),saved,failed)
 
     def search_projects(self):
         self.render_projects()
@@ -576,7 +685,6 @@ class MainWindow(QMainWindow):
         job.result.connect(done)
         job.failure.connect(failure or self.error)
         job.progress.connect(lambda count, directory: self.status.setText(f"Found {count} files · {directory}"))
-        job.node.connect(self.editor.set_node_state)
         job.finished.connect(lambda: self.finished_job(job))
         self.jobs.append(job)
         self.orb.show()
@@ -629,40 +737,49 @@ class MainWindow(QMainWindow):
         for path in self.projects:
             self.project_picker.addItem(Path(path).name, path)
         self.project_picker.blockSignals(False)
-        self.workflow_project.clear()
-        self.workflow_project.addItem("Choose a project", None)
-        for path in self.projects:
-            self.workflow_project.addItem(Path(path).name, path)
         self.storage_label.setText("Relay\nConnected" if result["online"] else "Storage offline\nCached projects")
         self.home_storage.setText((f"{len(self.projects)} projects · Storage connected" if result["online"] else
-                                   "Storage offline · Cached projects") + "\nShared files and reusable workflows")
+                                   "Storage offline · Cached projects") + "\nCreative projects and working files")
         self.status.setText(f"{len(self.projects)} projects available" + (" · Some storage unavailable" if result["errors"] else ""))
+        for project in self.projects:
+            self.artwork.request(project, refresh=True)
         self.render_projects()
         self.update_recent()
 
     def render_projects(self):
         self.filtered_projects = [p for p in self.projects if self.project_search.text().lower() in Path(p).name.lower()]
         self.project_cards.set_entries([{'name':Path(path).name,'path':path,
+            'artwork':self.artwork.request(path),
             'subtitle':'★ Favorite · Explore project →' if path in self.settings.data['favorites'] else 'Explore project →'} for path in self.filtered_projects])
+
+    def project_artwork_loaded(self,path):
+        for entry in self.project_cards.entries:
+            if entry['path']==path:
+                entry['artwork']=self.artwork.paths[path]
+                self.project_cards.artwork_pixmaps.pop(entry['artwork'],None)
+                self.project_cards.update()
+                break
+        if path in self.settings.data['recent'][:4]:self.update_recent()
 
     def open_project(self, path):
         if not path:
             return
         if path != self.project:
-            self.file_cards.offset = self.file_cards.target = 0.0
-            self.file_cards.selected_index = -1
+            self.file_cards.clear()
+            self.selected_variant = None
+            self.selected_stage = None
+            self.browse_step = "versions"
         self.project = path
         self.project_views.hide()
         self.work_panel.show()
         picker_index = self.project_picker.findData(path)
         if picker_index >= 0:
             self.project_picker.setCurrentIndex(picker_index)
-        workflow_index = self.workflow_project.findData(path)
-        if workflow_index >= 0:
-            self.workflow_project.setCurrentIndex(workflow_index)
         self.settings.recent(path)
         self.navigate("Projects")
-        self.breadcrumb.setText(Path(path).name + "  /  Working files")
+        self.stage_store = StageStore(path)
+        self.stage_document = self.stage_store.load(shared=False)
+        self.scan_pending = True
         self.breadcrumb.setToolTip(path)
         self.files = indexer.cached(path).get("files", [])
         self.populate_filters()
@@ -670,7 +787,15 @@ class MainWindow(QMainWindow):
         self.status.setText("Scanning " + Path(path).name + "…")
         for job in self.jobs:
             job.cancel.set()
-        self.worker(lambda job: indexer.scan(path, job.cancel, job.progress.emit),
+        def scan(job):
+            result = indexer.scan(path, job.cancel, job.progress.emit)
+            try:
+                result["stage_document"] = StageStore(path).load()
+            except ValueError as exc:
+                result["stage_document"] = {**StageStore(path).load(False), 'notice':str(exc)}
+                result['errors'].append(str(exc))
+            return result
+        self.worker(scan,
                     lambda result: self.scan_loaded(result, path))
         self.update_recent()
 
@@ -678,6 +803,8 @@ class MainWindow(QMainWindow):
         if self.project != path:
             return
         self.files = result["files"]
+        self.scan_pending = False
+        self.stage_document = result.get("stage_document", self.stage_document)
         self.populate_filters()
         self.filter_files()
         suffix = " · Scan cancelled" if result.get("cancelled") else " · Cached / offline" if result.get("cached") else ""
@@ -689,7 +816,7 @@ class MainWindow(QMainWindow):
 
     def populate_filters(self):
         titles = {"application": "All applications", "department": "All departments", "variant": "All variants",
-                  "shot": "All shots", "stage": "All stages", "version": "All versions"}
+                  "shot": "All shots", "stage": "All stages", "version": "All save revisions"}
         for key, combo in self.filters.items():
             current = combo.currentData()
             combo.blockSignals(True)
@@ -707,8 +834,11 @@ class MainWindow(QMainWindow):
         self.display_files = [f for f in self.files if f.get("kind", "working") == self.file_kind.currentData()
                               and search in f["relative"].lower()
                               and all(not combo.currentData() or f[key] == combo.currentData() for key, combo in self.filters.items())]
-        self.file_cards.set_entries([{**file,'subtitle':file['version']+' · '+file['department']+'\n'+
-            time.strftime('%d %b %Y · %H:%M',time.localtime(file['modified']))} for file in self.display_files])
+        self.display_files = [f for f in self.display_files
+                              if (self.selected_variant is None or self.variant_of(f)==self.selected_variant)
+                              and (self.selected_stage is None or self.stage_store.stage(f,self.stage_document)==self.selected_stage)]
+        self.file_cards.set_entries(self.display_files)
+        self.update_browser()
         self.update_details()
 
     def selected(self):
@@ -720,11 +850,13 @@ class MainWindow(QMainWindow):
             reveal_page(self.details_panel)
         file = self.selected()
         self.more_actions.setEnabled(bool(file))
+        if hasattr(self,"assign_button"):
+            self.assign_button.setEnabled(bool(self.file_cards.selectedItems()) and self.stage_document.get("writable",False))
         for item in self.file_actions:
             item.setEnabled(bool(file))
         if not file:
             self.detail_name.setText("Select a working file")
-            self.detail_info.setText("Its details and actions will appear here.")
+            self.detail_info.setPlainText("Its details and actions will appear here.")
             self.preview_source=icon('Projects',256).pixmap(256,256)
             self.fit_preview()
             return
@@ -733,8 +865,8 @@ class MainWindow(QMainWindow):
         metrics = QFontMetrics(self.detail_name.font())
         self.detail_name.setText(metrics.elidedText(file["name"], Qt.ElideMiddle, max(180, self.detail_name.width())))
         self.detail_name.setToolTip(file["name"])
-        relative = QFontMetrics(self.detail_info.font()).elidedText(file["relative"], Qt.ElideMiddle, max(180, self.detail_info.width()))
-        self.detail_info.setText(file["application"] + " · " + file["version"] + "\n" + file["department"] + " · " + file["stage"]
+        relative = file['path']
+        self.detail_info.setPlainText(file["application"] + " · " + file["version"] + "\n" + file["department"] + " · " + STAGES[self.stage_store.stage(file,self.stage_document)]
                                  + "\n" + f"{file['size'] / (1024 * 1024):.1f} MB" + "\n\n" + relative)
         self.detail_info.setToolTip(file["path"])
         pixmap=QPixmap()
@@ -905,85 +1037,6 @@ class MainWindow(QMainWindow):
         else:
             self.open_project(path)
 
-    def build_workflows(self):
-        layout = self.page("Workflows")
-        row = QHBoxLayout()
-        self.workflow_project = QComboBox()
-        row.addWidget(label("Project context", "subtitle"))
-        row.addWidget(self.workflow_project, 1)
-        self.workflow_project.setMinimumWidth(240)
-        layout.addLayout(row)
-        self.editor = GraphEditor(self.settings.data["graph_root"])
-        self.editor.preview_requested.connect(self.preview_graph)
-        layout.addWidget(self.editor, 1)
-
-    def preview_graph(self, document):
-        if not self.editor.library.online():
-            self.editor.refresh_library()
-            self.error("Reconnect the shared workflow library before previewing or running workflows.")
-            return
-        path = self.workflow_project.currentData() or self.project
-        if not path:
-            self.error("Choose a project context before previewing a workflow.")
-            return
-        self.editor.run_button.setEnabled(False)
-        def done(preview):
-            self.editor.run_button.setEnabled(True)
-            self.preview = preview
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Review workflow changes")
-            dialog.resize(820, 540)
-            layout = QVBoxLayout(dialog)
-            layout.addWidget(label("Ready when you are.", "title"))
-            layout.addWidget(label("These are the file changes and application launches this workflow will perform.", "subtitle", True))
-            text = QPlainTextEdit()
-            text.setReadOnly(True)
-            text.setPlainText("\n".join(self.describe_action(a) for a in preview["actions"]) or "This graph has no file-changing actions.")
-            layout.addWidget(text, 1)
-            buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
-            run = buttons.addButton("Run workflow", QDialogButtonBox.AcceptRole)
-            run.setObjectName("primary")
-            buttons.accepted.connect(dialog.accept)
-            buttons.rejected.connect(dialog.reject)
-            layout.addWidget(buttons)
-            if dialog.exec() == QDialog.Accepted:
-                self.run_graph(preview)
-        def failure(message):
-            self.editor.run_button.setEnabled(True)
-            self.error(message)
-        self.worker(lambda job: graph.plan(document, path, job.cancel, job.progress.emit), done, failure)
-
-    @staticmethod
-    def describe_action(action):
-        kind = action["kind"]
-        if kind == "copy":
-            return ("SKIP existing" if action.get("skip") else "COPY") + "  " + action["source"] + "\n     → " + action["destination"]
-        if kind == "mkdir":
-            return "CREATE FOLDER  " + action["destination"]
-        if kind == "open":
-            return "OPEN  " + action["source"]
-        return "LOG  " + action["message"] + f" ({action['count']} files)"
-
-    def run_graph(self, preview):
-        if not self.editor.library.online():
-            self.editor.refresh_library()
-            self.error("The shared workflow library disconnected after preview. Reconnect before running.")
-            return
-        self.editor.run_button.setEnabled(False)
-        configured = dict(self.settings.data["apps"])
-        def run(job):
-            return graph.execute(preview, lambda path: apps.open_file(path, indexer.EXTENSIONS.get(Path(path).suffix.lower(), ""), configured),
-                                 job.cancel, job.node.emit)
-        def done(records):
-            self.editor.run_button.setEnabled(True)
-            activity("Workflow run", name=preview["graph"]["name"], records=records)
-            self.status.setText(f"Workflow finished · {len(records)} actions recorded")
-            self.navigate("Activity")
-        def failure(message):
-            self.editor.run_button.setEnabled(True)
-            self.error(message)
-        self.worker(run, done, failure)
-
     def build_activity(self):
         layout = self.page("Activity")
         self.activity_table = table(["Event", "When", "Details"])
@@ -1020,9 +1073,6 @@ class MainWindow(QMainWindow):
         self.roots_edit.setMaximumHeight(85)
         inner.addWidget(self.roots_edit)
         inner.addWidget(button("Add storage folder", self.add_root))
-        inner.addWidget(label("Shared workflow-library root", "subtitle"))
-        self.graph_root_edit = QLineEdit(self.settings.data["graph_root"])
-        inner.addWidget(self.graph_root_edit)
         form_layout.addWidget(frame)
         frame, inner = card()
         inner.addWidget(label("Creative applications", "section"))
@@ -1078,14 +1128,9 @@ class MainWindow(QMainWindow):
         if not roots:
             self.error("Add at least one project-library root.")
             return
-        if not self.graph_root_edit.text().strip():
-            self.error("Set a shared workflow-library root.")
-            return
-        self.settings.data.update(roots=roots, graph_root=self.graph_root_edit.text().strip(), apps={k: f.text().strip() for k, f in self.app_fields.items()},
+        self.settings.data.update(roots=roots, apps={k: f.text().strip() for k, f in self.app_fields.items()},
                                   theme=self.theme.currentText(), reduced_motion=self.reduced.isChecked())
         self.settings.save()
-        self.editor.library = GraphLibrary(self.settings.data["graph_root"])
-        self.editor.refresh_library()
         self.apply_theme()
         self.load_projects()
         self.status.setText("Settings saved")
@@ -1110,15 +1155,6 @@ class MainWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
-        current_project = self.workflow_project.currentData()
-        self.workflow_project.blockSignals(True)
-        self.workflow_project.clear()
-        self.workflow_project.addItem("Choose a project", None)
-        for path in self.projects:
-            self.workflow_project.addItem(Path(path).name, path)
-        if current_project:
-            self.workflow_project.setCurrentIndex(max(0, self.workflow_project.findData(current_project)))
-        self.workflow_project.blockSignals(False)
         QTimer.singleShot(0, self, lambda: self.move_selection(next((n for n, b in self.nav.items() if b.isChecked()), "Home")))
 
     def changeEvent(self, event):
@@ -1143,7 +1179,7 @@ class MainWindow(QMainWindow):
                     self.preview_image.setFixedHeight(44 if self.height()<=760 else 78)
                     self.fit_preview()
                 for frame in self.pages["Home"].findChildren(GradientTile):
-                    if frame.tone in ("Projects", "Workflows", "Favorites"):
+                    if frame.tone in ("Projects", "Favorites"):
                         for artwork in frame.findChildren(MotionIcon):
                             size = 90 if self.width() <= 1150 else 112
                             artwork.setFixedSize(size, size)

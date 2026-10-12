@@ -1,0 +1,90 @@
+import json
+from pathlib import Path
+import pytest
+from PySide6.QtGui import QImage, QColor
+from PySide6.QtWidgets import QApplication
+from neotrix_prism.project_metadata import StageStore, inferred_stage, inheritance_snapshot
+from neotrix_prism.storage import exclusive_lock
+from neotrix_prism import indexer
+
+
+@pytest.fixture
+def project(tmp_path,monkeypatch):
+    monkeypatch.setenv('NEOTRIX_USER_DIR',str(tmp_path/'prefs'))
+    project=tmp_path/'project';project.mkdir()
+    return project
+
+
+def test_stage_concurrent_edit_and_lock(project):
+    one,two=StageStore(project),StageStore(project)
+    old=two.load()['fingerprint']
+    saved=one.save([project/'scene_v001.blend'],'layout',old)
+    with pytest.raises(RuntimeError,match='another workstation'):
+        two.save([project/'scene_v002.blend'],'lighting',old)
+    with exclusive_lock(one.path.with_suffix('.lock')):
+        with pytest.raises(RuntimeError,match='another session'):
+            two.save([project/'scene_v002.blend'],'lighting',saved['fingerprint'])
+    assert one.load()['assignments']=={'scene_v001.blend':'layout'}
+    with pytest.raises(ValueError):one.save([project.parent/'outside.blend'],'lighting',saved['fingerprint'])
+
+
+def test_stage_offline_cache_and_corrupt_document(project):
+    store=StageStore(project)
+    store.save([project/'scene.blend'],'lighting',None)
+    store.project=project/'disconnected';store.path=store.project/'_TOOLS/neotrix-prism/stages.json'
+    document=store.load()
+    assert document['assignments']=={'scene.blend':'lighting'}
+    assert not document['writable']
+    with pytest.raises(OSError):store.save([store.project/'scene.blend'],'layout',None)
+    corrupt=StageStore(project)
+    corrupt.path.write_text('{broken')
+    with pytest.raises(ValueError):corrupt.load()
+
+
+def test_stage_readonly_and_inheritance(project,monkeypatch):
+    store=StageStore(project)
+    saved=store.save([project/'scene_v001.blend'],'lighting',None)
+    snapshot=inheritance_snapshot(project/'scene_v001.blend')
+    assert snapshot[2]=='lighting'
+    snapshot[0].save([project/'scene_v002.blend'],snapshot[2],snapshot[1])
+    assert store.load()['assignments']=={'scene_v001.blend':'lighting','scene_v002.blend':'lighting'}
+    monkeypatch.setattr('neotrix_prism.project_metadata.os.access',lambda *args:False)
+    document=store.load()
+    assert not document['writable']
+    with pytest.raises(PermissionError):store.save([project/'scene_v003.blend'],'layout',document['fingerprint'])
+
+
+def test_variant_recipe_and_stage_inference(project):
+    paths={'03_PRODUCTION/WORK/3D/ASSETS/projects/NTX_Vertical_0010_v001.blend':'modelling',
+           '03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/PROJECTS/NTX_Vertical_0010_v002.blend':'unassigned',
+           '03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/COMPOSITING/projects/NTX_Vertical_0010_v003.aep':'compositing',
+           '03_PRODUCTION/WORK/GRAPHIC_DESIGN/projects/NTX_Summer_v001.ai':'other'}
+    for relative,expected in paths.items():
+        path=project/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'fixture')
+        file=indexer.parse(path,project)
+        assert inferred_stage(file)==expected
+        assert file['variant']==('Summer' if expected=='other' else 'Vertical')
+
+
+def test_icon_candidates_fallback_and_cache(project,monkeypatch,tmp_path):
+    app=QApplication.instance() or QApplication([])
+    from neotrix_prism import project_browser
+    icons=project/'_TOOLS/icon';icons.mkdir(parents=True)
+    template=tmp_path/'template';template.mkdir()
+    monkeypatch.setattr(project_browser,'TEMPLATE_ICON',template)
+    cache=tmp_path/'cache/project.png'
+    image=QImage(64,64,QImage.Format_ARGB32);image.fill(QColor('#ff0000'));image.save(str(icons/'project.png'))
+    assert project_browser.read_icon(project,cache)==str(cache)
+    assert QImage(str(cache)).pixelColor(20,20)==QColor('#ff0000')
+    (icons/'project.png').write_bytes(b'corrupt')
+    image.fill(QColor('#0000ff'));image.save(str(template/'project.png'))
+    project_browser.read_icon(project,cache)
+    assert QImage(str(cache)).pixelColor(20,20)==QColor('#0000ff')
+    assert project_browser.read_icon(tmp_path/'disconnected-project',cache)==str(cache)
+    (template/'project.png').unlink()
+    assert project_browser.read_icon(project,cache)==str(cache)
+    cache.unlink()
+    assert project_browser.read_icon(project,cache).endswith('project-placeholder.png')
+    (icons/'project.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#00ff00"/></svg>')
+    assert project_browser.read_icon(project,cache)==str(cache)
+    assert QImage(str(cache)).pixelColor(20,20)==QColor('#00ff00')

@@ -1,0 +1,29 @@
+{
+  "icons": [
+    {
+      "asset": "modelling.png",
+      "tool": "built-in image_gen",
+      "transparent_background": true,
+      "prompt": "Create ONE premium desktop UI icon of a thick beveled polygon mesh cube with subtle wireframe edges. coral orange accent, matching polished 3D product icon family, chunky extruded geometry, glossy satin material, softly beveled edges, gentle three-quarter view, readable silhouette at 64 pixels, object centered with generous clear margins, transparent background, no lettering, no logos, no frame, no ground plane. This will represent modelling in Neotrix Prism's purple Windows project browser. Output a single isolated icon."
+    },
+    {
+      "asset": "layout.png",
+      "tool": "built-in image_gen",
+      "transparent_background": true,
+      "prompt": "Create ONE premium desktop UI icon of a miniature camera framing three geometric blocks on a tiny stage platform. cyan blue accent, matching polished 3D product icon family, chunky extruded geometry, glossy satin material, softly beveled edges, gentle three-quarter view, readable silhouette at 64 pixels, object centered with generous clear margins, transparent background, no lettering, no logos, no frame, no ground plane. This will represent layout in Neotrix Prism's purple Windows project browser. Output a single isolated icon."
+    },
+    {
+      "asset": "lighting.png",
+      "tool": "built-in image_gen",
+      "transparent_background": true,
+      "prompt": "Create ONE premium desktop UI icon of a miniature studio spotlight with a thick housing and small warm illuminated cone. golden yellow accent, matching polished 3D product icon family, chunky extruded geometry, glossy satin material, softly beveled edges, gentle three-quarter view, readable silhouette at 64 pixels, object centered with generous clear margins, transparent background, no lettering, no logos, no frame, no ground plane. This will represent lighting in Neotrix Prism's purple Windows project browser. Output a single isolated icon."
+    },
+    {
+      "asset": "compositing.png",
+      "tool": "built-in image_gen",
+      "transparent_background": true,
+      "prompt": "Create ONE premium desktop UI icon of three thick overlapping translucent image layers with rounded corners and an abstract landscape. violet pink accent, matching polished 3D product icon family, chunky extruded geometry, glossy satin material, softly beveled edges, gentle three-quarter view, readable silhouette at 64 pixels, object centered with generous clear margins, transparent background, no lettering, no logos, no frame, no ground plane. This will represent compositing in Neotrix Prism's purple Windows project browser. Output a single isolated icon."
+    }
+  ],
+  "other_and_unassigned": "Original Neotrix vector artwork rendered to transparent PNG."
+}

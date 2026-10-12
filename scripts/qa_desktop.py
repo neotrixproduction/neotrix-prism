@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.environ["NEOTRIX_USER_DIR"] = str(ROOT / "artifacts/visual-prefs" / os.environ.get("QT_SCALE_FACTOR", "default"))
+os.environ["NEOTRIX_USER_DIR"] = str(ROOT / "artifacts/visual-prefs" / ((sys.argv[1] if len(sys.argv)>1 else 'light')+'-'+os.environ.get("NEOTRIX_CAPTURE_NAME",os.environ.get("QT_SCALE_FACTOR", "default"))))
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
 from neotrix_prism.ui import MainWindow
@@ -19,6 +19,8 @@ files = ["03_PRODUCTION/WORK/3D/SHOTS/NTX_Landscape_0010/PROJECTS/NTX_Landscape_
          "03_PRODUCTION/WORK/GRAPHIC_DESIGN/PROJECTS/Neotrix_Logotype_v002.ai",
          "03_PRODUCTION/WORK/MOTION_GRAPHICS/PROJECTS/Title_Sequence_V0004.aep",
          "04_POST/PROJECTS/NTX_0010_v002.comp", "05_DELIVERY/Review_v002.mp4"]
+files += ['03_PRODUCTION/WORK/3D/ASSETS/projects/NTX_Landscape_0010_v001.blend',
+          '03_PRODUCTION/WORK/3D/SHOTS/NTX_Landscape_0010/COMPOSITING/projects/NTX_Landscape_0010_v003.aep']
 for relative in files:
     path = project / relative
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -28,6 +30,11 @@ for name in ("Neotrix Brand System", "Neotrix Motion Library", "Neotrix Product 
              "Neotrix Character Lab","Neotrix Design Library","Neotrix Studio Series","Neotrix Title Design"):
     (root / name).mkdir(parents=True, exist_ok=True)
 app = QApplication([])
+from neotrix_prism.project_metadata import StageStore
+store=StageStore(project)
+doc=store.load()
+if not doc['assignments']:
+    store.save([project/files[0],project/files[1]],'lighting',doc['fingerprint'])
 settings = Settings()
 settings.data.update(roots=[str(root)], graph_root=str(root), reduced_motion=True, theme=sys.argv[1] if len(sys.argv)>1 else "light",
                      favorites=[str(project)], recent=[str(project)])

@@ -13,7 +13,7 @@ MEDIA = {".png": "Image", ".jpg": "Image", ".jpeg": "Image", ".exr": "Image", ".
 OUTPUT_DIRS = {"exports", "export", "renders", "render", "playblasts", "05_delivery", "delivery"}
 SKIP = {"node_modules", "__pycache__", "$recycle.bin", "#recycle", "system volume information",
         "_shot_template", "_neotrix_prism", "auto-save", "autosave", "adobe after effects auto-save",
-        ".git", "synologydrive", "@eadir"}
+        ".git", "synologydrive", "@eadir", "_tools"}
 STAGES = {"Preproduction": ("preproduction", "preprod", "storyboard", "animatic"),
           "Modeling": ("modeling", "modelling", "model"), "Lookdev": ("lookdev", "shading", "texture"),
           "Rigging": ("rigging", "rig"), "Layout": ("layout", "blocking"), "Animation": ("animation", "anim"),
@@ -71,6 +71,10 @@ def parse(path, project):
                 variant = candidate
             break
     stat = path.stat()
+    if variant == 'Unspecified':
+        match = re.match(r'(?i)^[a-z]{3}_([a-z][a-z0-9]*)_(?:\d{4}_)?v\d+(?:_|$)', path.stem)
+        if match:
+            variant = match[1]
     preview = None
     for suffix in (".png", ".jpg", ".jpeg"):
         candidate = path.with_suffix(suffix)

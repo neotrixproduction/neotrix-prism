@@ -7,7 +7,6 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtTest import QTest
 from neotrix_prism.storage import Settings
 from neotrix_prism.ui import MainWindow
-from neotrix_prism.graph_ui import NodeItem
 
 
 @pytest.fixture
@@ -39,7 +38,8 @@ def window(tmp_path, monkeypatch):
 
 def test_navigation_filter_favorite_theme(window):
     window, project, messages, wait = window
-    assert window.workflow_project.count() == 2
+    assert "Workflows" not in window.nav
+    assert not hasattr(window,"editor")
     window.open_project(str(project))
     wait()
     assert window.file_cards.rowCount() == 6
@@ -54,36 +54,14 @@ def test_navigation_filter_favorite_theme(window):
     window.theme.setCurrentText("dark")
     window.save_settings()
     wait()
-    assert window.editor.dark
+    assert window.surface.dark
     assert not messages
-
-
-def test_graph_canvas_inspector_validation(window):
-    window, project, messages, wait = window
-    window.navigate("Workflows")
-    editor = window.editor
-    editor.inspect(editor.graph["nodes"][2])
-    assert editor.form.rowCount() == 3
-    before = len(editor.graph["nodes"])
-    editor.kind.setCurrentText("Open Files")
-    editor.add_node()
-    assert len(editor.graph["nodes"]) == before + 1
-    item = editor.items[editor.graph["nodes"][-1]["id"]]
-    item.setSelected(True)
-    editor.remove_selected()
-    assert len(editor.graph["nodes"]) == before
-    start = editor.items["1"].pos()
-    editor.items["1"].setPos(start.x() + 30, start.y())
-    assert editor.graph["nodes"][1]["position"][0] == start.x() + 30
-    assert len(editor.edges) == 7
 
 
 def test_rounded_shell_maximize_restore(window):
     window, project, messages, wait = window
-    window.workflow_project.setCurrentIndex(window.workflow_project.findData(str(project)))
     assert window.windowFlags() & Qt.FramelessWindowHint
     assert not window.surface.mask().contains(QPoint(0, 0))
-    assert window.workflow_project.currentData() == str(project)
     assert window.surface.mask().contains(window.surface.rect().center())
     window.showMaximized()
     QTest.qWait(80)
@@ -109,13 +87,15 @@ def test_interrupted_page_motion_and_sidebar(window):
     QTest.qWait(450)
     assert window.sidebar.width() == 78
     assert all(not button.text() and button.toolTip() for button in window.nav.values())
-    QTest.mouseClick(window.nav['Workflows'], Qt.LeftButton)
+    QTest.mouseClick(window.nav['Activity'], Qt.LeftButton)
     QTest.qWait(450)
-    assert window.stack.currentWidget() is window.pages['Workflows']
+    assert window.stack.currentWidget() is window.pages['Activity']
     window.toggle_sidebar()
     QTest.qWait(450)
+    deadline=time.time()+2
+    while window.sidebar.width()!=202 and time.time()<deadline:QTest.qWait(20)
     assert window.sidebar.width() == 202
-    assert window.selection_rail.geometry() == window.nav['Workflows'].geometry()
+    assert window.selection_rail.geometry() == window.nav['Activity'].geometry()
     assert window.orb.spin.state() == QAbstractAnimation.Stopped
     assert not messages
 
@@ -209,7 +189,7 @@ def test_tile_scene_transition_interrupt_and_reduce(window):
     assert transition.origin is not None
     assert transition.isVisible()
     assert window.stack.currentWidget() is window.pages['Projects']
-    window.navigate('Workflows')
+    window.navigate('Activity')
     window.navigate('Settings')
     window.settings.data['reduced_motion'] = True
     window.apply_theme()
@@ -251,8 +231,9 @@ def test_project_shelf_keyboard_and_file_card_actions(window,monkeypatch):
     QTest.keyClick(window.project_cards,Qt.Key_Return)
     wait()
     assert window.work_panel.isVisible() and not window.project_views.isVisible()
+    window.selected_stage="other";window.browse_step="files";window.filter_files()
     window.file_cards.selectRow(0)
-    QTest.keyClick(window.file_cards,Qt.Key_Right)
+    QTest.keyClick(window.file_cards,Qt.Key_Down)
     assert window.selected()['path']==window.display_files[1]['path']
     opened=[]
     monkeypatch.setattr(window,'open_path',lambda path,application=None:opened.append(path))
@@ -268,48 +249,67 @@ def test_project_shelf_keyboard_and_file_card_actions(window,monkeypatch):
     assert not messages
 
 
-def test_virtualized_card_gallery_scroll_and_reduced_motion(window):
-    from PySide6.QtCore import QAbstractAnimation,QPointF
+def test_uniform_grid_spacing_and_pointer(window):
     window,project,messages,wait=window
-    window.open_project(str(project));wait()
-    records=[{**window.display_files[0],'name':f'Creative file {i}.blend','path':f'/fixture/{i}.blend'} for i in range(1000)]
-    window.file_cards.set_entries(records)
-    window.file_cards.selectRow(999)
-    QTest.qWait(30)
-    window.file_cards.grab()
-    assert window.file_cards.offset==window.file_cards.limit()
-    assert len(window.file_cards.hit_boxes)<32
-    assert any(i==999 for i,rect in window.file_cards.hit_boxes)
-    QTest.keyClick(window.file_cards,Qt.Key_Home)
-    assert window.file_cards.offset==0
-    window.settings.data['reduced_motion']=False
-    window.file_cards.scroll_to(window.file_cards.limit())
-    QTest.qWait(60)
-    assert window.file_cards._scroll.state()==QAbstractAnimation.Running
-    window.settings.data['reduced_motion']=True;window.apply_theme()
-    assert window.file_cards._scroll.state()==QAbstractAnimation.Stopped
-    assert window.file_cards.offset==window.file_cards.target
+    grid=window.project_cards
+    grid.set_entries([{'name':f'Project {i}','path':f'/fixture/{i}'} for i in range(12)])
+    window.navigate('Projects');window.browse_projects()
+    QTest.qWait(40);grid.grab()
+    first=[rect for i,rect in grid.hit_boxes if i<grid.columns()]
+    assert len({round(rect.width(),2) for rect in first})==1
+    assert first[0].left()==24
+    for left,right in zip(first,first[1:]):assert right.left()-left.right()==pytest.approx(20)
+    opened=[]
+    grid.activated.disconnect();grid.activated.connect(opened.append)
+    QTest.mouseClick(grid,Qt.LeftButton,pos=first[0].center().toPoint())
+    assert opened==[0]
     assert not messages
 
 
-def test_project_shelf_pointer_centers_then_opens(window):
-    from neotrix_prism.cards import CardSurface
+def test_named_version_stage_navigation_and_multiselect(window):
     window,project,messages,wait=window
-    window.settings.data['reduced_motion']=False
-    shelf=CardSurface(shelf=True,parent=window)
-    shelf.setGeometry(230,160,680,360)
-    shelf.set_entries([{'name':f'Project {i}','path':f'/qa/{i}'} for i in range(20)])
-    shelf.show();shelf.raise_()
-    QTest.qWait(30);shelf.grab()
-    opened=[];shelf.activated.connect(opened.append)
-    rect=next(rect for index,rect in shelf.hit_boxes if index==11)
-    QTest.mouseClick(shelf,Qt.LeftButton,pos=rect.center().toPoint())
-    QTest.qWait(760)
-    assert shelf.offset==pytest.approx(11.0)
-    assert not opened
-    shelf.grab()
-    rect=next(rect for index,rect in shelf.hit_boxes if index==11)
-    QTest.mouseClick(shelf,Qt.LeftButton,pos=rect.center().toPoint())
-    assert opened==[11]
-    shelf.close();shelf.deleteLater()
+    for relative in ('03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/PROJECTS/NTX_Vertical_0010_v001.blend',
+                     '03_PRODUCTION/WORK/3D/ASSETS/projects/NTX_Vertical_0010_v001.blend',
+                     '03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/COMPOSITING/projects/NTX_Vertical_0010_v001.aep'):
+        file=project/relative;file.parent.mkdir(parents=True,exist_ok=True);file.write_bytes(b'fixture')
+    window.open_project(str(project));wait()
+    assert window.browse_step=='versions'
+    assert {e['name'] for e in window.choice_cards.entries}=={'General','Vertical'}
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['name']=='Vertical'))
+    assert window.browse_step=='stages'
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='unassigned'))
+    assert window.file_cards.rowCount()==1
+    assert window.display_files[0]['name']=='NTX_Vertical_0010_v001.blend'
+    old=window.stage_document['fingerprint']
+    window.stage_document=window.stage_store.save([window.display_files[0]['path']],'lighting',old)
+    window.filter_files()
+    assert window.file_cards.rowCount()==0
+    window.breadcrumb_clicked('stages')
+    assert window.browse_step=='stages'
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='lighting'))
+    assert window.file_cards.rowCount()==1
+    window.breadcrumb_clicked('versions')
+    assert window.browse_step=='versions'
+    assert not messages
+
+
+def test_bulk_stage_assignment_and_long_file_list(window):
+    window,project,messages,wait=window
+    window.open_project(str(project));wait()
+    window.selected_stage='other';window.browse_step='files';window.filter_files()
+    window.file_cards.selectAll()
+    assert len(window.file_cards.selected_files())==6
+    assert window.assign_button.isEnabled()
+    window.apply_stage(window.file_cards.selected_files(),'layout');wait()
+    assert window.file_cards.rowCount()==0
+    window.selected_stage='layout';window.filter_files()
+    assert window.file_cards.rowCount()==6
+    assert all(window.stage_store.stage(f,window.stage_document)=='layout' for f in window.display_files)
+    records=[{**window.display_files[0],'name':f'File {i}.blend','path':f'/fixture/{i}.blend'} for i in range(1000)]
+    window.file_cards.set_entries(records)
+    window.file_cards.selectRow(999);QTest.qWait(30)
+    assert window.file_cards.currentRow()==999
+    assert window.file_cards.visualItemRect(window.file_cards.item(999)).intersects(window.file_cards.viewport().rect())
+    QTest.keyClick(window.file_cards,Qt.Key_Home)
+    assert window.file_cards.currentRow()==0
     assert not messages

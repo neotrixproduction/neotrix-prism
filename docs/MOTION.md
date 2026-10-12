@@ -70,3 +70,11 @@ unmodified font and SIL OFL license are in assets/fonts.
 For separately licensed local fonts, developers can set NEOTRIX_FONT_DIR,
 NEOTRIX_FONT_DISPLAY and NEOTRIX_FONT_TEXT. These are local overrides; custom
 font files are never added to a package by that mechanism.
+
+## Project browsing, 0.5.0
+
+Uniform card bounds and gaps replace the perspective shelf. Card labels are drawn
+directly at device resolution; only artwork rotates and scales on hover. Named
+version and stage choices share the grid. File rows use the native item-view
+delegate, with rounded selection feedback and keyboard/multi-selection support.
+The independent Workflows page is removed. Existing fixed orb placement remains.

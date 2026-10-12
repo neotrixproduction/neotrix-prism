@@ -19,7 +19,7 @@ def main():
     PACKAGE.mkdir(parents=True, exist_ok=True)
     for name in ("Prism", "neotrix_prism", "runtime"):
         shutil.copytree(ROOT / name, PACKAGE / name, dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "PythonLibs", "Python313", "Python311"))
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "PythonLibs", "Python313", "Python311", "graph_ui.py", "graph.py"))
     shutil.copytree(ROOT / "docs", PACKAGE / "docs", dirs_exist_ok=True)
     shutil.copytree(ROOT / "assets", PACKAGE / "assets", dirs_exist_ok=True)
     (PACKAGE / "scripts").mkdir(exist_ok=True)
@@ -29,7 +29,6 @@ def main():
     (PACKAGE / "Launch Neotrix Prism.cmd").write_text('@echo off\nstart "" "%~dp0runtime\\pythonw.exe" "%~dp0launch.py"\n')
     (PACKAGE / "Install Integrations.cmd").write_text('@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\\install-integrations.ps1"\npause\n')
     build(PACKAGE / "integration-packages")
-    shutil.copytree(ROOT / "examples", PACKAGE / "examples", dirs_exist_ok=True)
     licenses = PACKAGE / "ThirdPartyLicenses"
     licenses.mkdir(exist_ok=True)
     records = []

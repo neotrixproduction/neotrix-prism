@@ -16,11 +16,18 @@ actual = core.appPlugin.getCurrentFileName(core)
 assert Path(actual) == source, actual
 def save(path):
     return core.appPlugin.saveScene(core, path.replace("\\", "/"))
-destination = save_next(source, save)
+from neotrix_prism.project_metadata import StageStore
+from neotrix_prism.integration import save_version_dialog
+from PySide6.QtWidgets import QMessageBox
+store=StageStore(source.parent)
+store.save([source],'compositing',store.load()['fingerprint'])
+QMessageBox.question=lambda *args:QMessageBox.Save
+destination=save_version_dialog(core,expected_source=str(source))
+assert destination and store.load()['assignments'][destination.name]=='compositing'
 core.appPlugin.sendCmd("app.open(new File(" + json.dumps(destination.as_posix()) + "));")
 reply = core.appPlugin.sendCmd("app.project.item(1).numLayers;").decode()
 assert reply == "2", reply
 assert Path(core.appPlugin.getCurrentFileName(core)) == destination
 (source.parent / "result.json").write_text(json.dumps({"application": "After Effects 2026", "saved": destination.name,
-    "unsaved_changes_preserved": True, "reopened": True, "transport": "installed Neotrix CEP panel"}, indent=2))
+    "unsaved_changes_preserved": True, "reopened": True, "stage_inherited":True, "transport": "installed Neotrix CEP panel"}, indent=2))
 print("NEOTRIX_AFTEREFFECTS_SAVE_REOPEN_PASS", destination.name)

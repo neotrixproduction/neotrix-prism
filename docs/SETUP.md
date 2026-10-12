@@ -5,16 +5,37 @@
 3. Open Settings and check your storage roots and application executables.
 4. Open Projects, choose a project and double-click a working file.
 
-The project shelf uses upright cards with perspective and fading side edges.
-Scroll or drag horizontally, or use arrow keys; click a side card to center it,
-then click the centered card or press Enter to open the project. Previous/next
-controls also browse the shelf. Searching projects returns to this view.
+Projects use equal-size cards with equal spacing. Click a card or press Enter.
+Choose a named campaign version when present (such as Vertical or Summer), then
+choose a production stage. General contains files without a named version.
+Save revisions such as v001 remain visible in the final file list.
 
-The file gallery scrolls vertically without visible scrollbars. Click a card
-for details, double-click or press Enter to open it. Arrow keys, Home/End and
-Page Up/Down work too. Open and Save Version stay visible in the details card;
-More Actions contains Open With, Reveal, Copy Path and Favorite. Longer metadata
-scrolls independently. Reduce Motion in Settings stops scroll/hover animations.
+File rows support Ctrl/Shift multi-selection. Double-click or Enter opens the
+current file. Use Assign stage to label selected files. Breadcrumb links return
+to versions, stages or the project library. Scrollbars stay hidden; wheel,
+keyboard and touchpad scrolling remain available.
+
+## Project icons and shared stages
+
+Put `project.png`, `project.svg` or `project.webp` in each project's `_TOOLS/icon`.
+PNG takes precedence. Missing or corrupt artwork falls back to the template
+placeholder, then the bundled placeholder. Icons load in the background and
+remain cached offline; Refresh updates them. The template placeholder lives at
+`N:\Projects\Template\COMMERCIAL_ADS_TEMPLATE_V3\_TOOLS\icon\project.png`.
+
+Modelling is inferred from `3D/ASSETS/projects`; Compositing from shot
+`COMPOSITING/projects`. Shot `PROJECTS` files begin as Unassigned because the
+same folder contains layout and lighting scenes. Assign those stages explicitly.
+Other work keeps graphics, motion graphics and legacy files accessible.
+
+Stage assignments are shared in `_TOOLS/neotrix-prism/stages.json`, using paths
+relative to the project. Files stay in their existing folders. Concurrent edits
+are rejected with instructions to refresh. Labels remain viewable from cache
+offline, but editing requires a connected writable project. A successful new
+version inherits its source document's explicit stage; old revisions retain theirs.
+
+Manrope is bundled. Labels render without perspective transforms; depth and
+hover effects apply to artwork. Reduce Motion disables animated transitions.
 
 The default library is Relay. Existing project folders are scanned in place.
 No migration is performed. Refresh with F5; scans can be cancelled. Storage
@@ -47,32 +68,13 @@ version. If another artist saved a version after the preview, preview again.
 If saving from a selected desktop file, that same file must be active in the
 application. Illustrator and Fusion version saving is outside this preview.
 
-## Workflows
-
-The shared library is _NEOTRIX_PRISM/Graphs under the configured workflow root.
-An example graph is shipped under examples/. Import it and save it to the shared
-library, or open the example already installed on Relay.
-
-Choose a project context. Drag matching ports to connect nodes; double-click a
-node to edit its properties. Scroll to zoom, middle-drag to pan, and Delete to
-remove selected nodes. Arrow keys move a focused node; Enter opens its inspector.
-
-Build Destination Path uses a relative folder inside the selected project.
-Preview shows planned copies, folders and launches. Run is manual. Copies keep
-their relative directory structure and skip existing destinations. Cancellation
-keeps completed copies in the Activity report and removes an incomplete copy
-created by that run. Errors stop subsequent actions.
-
-Graph documents have format version 1, a revision number, typed nodes and edges.
-No arbitrary scripts, commands, deletes, moves or background triggers are
-available. Reconnect the shared library before editing or running cached graphs.
-
 ## Maintenance
 
-Local settings and history are under LocalAppData/NeotrixPrism. Include the shared
-graph directory and managed projects' 00_Pipeline configuration in your backup.
+Local settings and history are under LocalAppData/NeotrixPrism. Include project `_TOOLS/neotrix-prism` metadata and managed projects'
+00_Pipeline configuration in your backup. Existing graph documents are retained
+but Workflows is no longer available in the desktop or portable package.
 
-Version reservations and graph edits use exclusive .lock files. If a process
+Version reservations and stage edits use exclusive .lock files. If a process
 crashes, verify that no save/edit is active before manually removing its stale
 lock. Locks are never expired automatically while another save may be running.
 

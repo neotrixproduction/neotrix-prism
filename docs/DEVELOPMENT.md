@@ -24,11 +24,11 @@ Modules:
 
 - indexer: filesystem-only parsing, exclusion rules and local cache.
 - versions: cooperative SMB reservations and callback-based in-memory saves.
-- graph: validation, a frozen preview plan and sequential file execution.
-- storage: local preferences, atomic graph files and stale-edit detection.
+- project_metadata: shared stage labels, relative paths, locks and conflict checks.
+- storage: local preferences, atomic JSON documents and exclusive locks.
 - integration/bridge: upstream adapters, separate GUI entry points and whitelisted
   localhost Adobe commands.
-- ui/graph_ui/design: Qt workspace, node canvas and shared visual tokens.
+- ui/project_browser/design: Qt workspace, uniform cards, native file rows and visual tokens.
 
 Keep the upstream projectBrowser API unchanged for production tools. Neotrix
 entry points use core.neotrixBrowser instead. This prevents SDK callers expecting

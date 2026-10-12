@@ -45,6 +45,7 @@ class CardSurface(QWidget):
         self.hover = 0.0
         self.hit_boxes = []
         self.previews = {}
+        self.artwork_pixmaps = {}
         self.drag_start = None
         self.dragged = False
         self.setFocusPolicy(Qt.StrongFocus)
@@ -60,6 +61,7 @@ class CardSurface(QWidget):
         # Only bounded thumbnails of existing preview files; no DCC launch or
         # full-size image cache is used to decorate a card.
         self.previews.clear()
+        self.artwork_pixmaps.clear()
         self.selected_index = next((i for i,e in enumerate(entries) if e.get('path') == old), -1)
         self.target = min(self.target,self.limit())
         self.offset = min(self.offset,self.limit())
@@ -294,13 +296,6 @@ class CardSurface(QWidget):
         p.save()
         p.setOpacity(opacity)
         lift = 7*hover
-        rect = rect.translated(0,-lift)
-        transform = QTransform()
-        transform.translate(rect.center().x(),rect.center().y())
-        transform.rotate(max(-24,min(24,-distance*14))+hover*max(-8,min(8,(self.pointer.x()-rect.center().x())/15)),Qt.YAxis)
-        transform.rotate(hover*max(-5,min(5,(rect.center().y()-self.pointer.y())/18)),Qt.XAxis)
-        transform.translate(-rect.center().x(),-rect.center().y())
-        p.setTransform(transform,True)
         # A contact shadow anchors the floating face, while its highlight
         # responds to the pointer. Artwork has its own generous safe bounds.
         p.setPen(Qt.NoPen)
@@ -344,12 +339,25 @@ class CardSurface(QWidget):
                 else:
                     height=source.width()/ratio;source.setTop((source.height()-height)/2);source.setHeight(height)
                 p.drawPixmap(preview_rect,pixmap,source);p.restore()
-        art_size = min(140 if self.shelf else 78,rect.height()*(.48 if self.shelf else .4))
+        art_size = min(getattr(self,'art_size',140 if self.shelf else 78),rect.height()*.48)
         p.save()
         p.translate(rect.right()-art_size*.65-18,rect.top()+art_size*.6+10)
         p.rotate(-distance*7-8*hover)
         p.scale(1+.08*hover,1+.08*hover)
-        artwork=icon(entry.get('application','Projects'),90).pixmap(90,90)
+        if entry.get('artwork'):
+            path=entry['artwork']
+            if path not in self.artwork_pixmaps:
+                from PySide6.QtGui import QImageReader
+                reader=QImageReader(path)
+                size=reader.size()
+                if size.isValid():reader.setScaledSize(size.scaled(320,320,Qt.KeepAspectRatio))
+                self.artwork_pixmaps[path]=QPixmap.fromImage(reader.read())
+                if len(self.artwork_pixmaps)>64:self.artwork_pixmaps.pop(next(iter(self.artwork_pixmaps)))
+            artwork=self.artwork_pixmaps[path]
+        else:
+            artwork=icon(entry.get('application','Projects'),256).pixmap(256,256)
+        if artwork.isNull():
+            artwork=icon('Projects',256).pixmap(256,256)
         p.drawPixmap(QRectF(-art_size/2,-art_size/2,art_size,art_size),artwork,QRectF(artwork.rect()))
         p.restore()
         font=QFont(self.font());font.setPixelSize(10);font.setBold(True);p.setFont(font)

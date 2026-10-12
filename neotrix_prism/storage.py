@@ -65,7 +65,7 @@ class Settings:
     def __init__(self):
         self.path = user_dir() / "settings.json"
         self.data = read_json(self.path, {})
-        for key, value in {"roots": [DEFAULT_ROOT], "graph_root": DEFAULT_ROOT, "apps": {}, "favorites": [], "recent": [],
+        for key, value in {"roots": [DEFAULT_ROOT], "apps": {}, "favorites": [], "recent": [],
                            "theme": "light", "reduced_motion": False}.items():
             self.data.setdefault(key, value)
 

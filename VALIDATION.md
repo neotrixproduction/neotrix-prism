@@ -103,6 +103,38 @@
   launched to create gallery thumbnails. Existing open/save services are retained.
 - Advanced native Prism/DCC interfaces retain the host-validation limits below.
 
+## 0.5.0 staged project browser
+
+- 35 automated tests pass: uniform spacing and pointer activation; named-version,
+  stage and breadcrumb navigation; Ctrl/Shift bulk selection and shared labels;
+  a 1,000-file native list; real Manrope family resolution; existing fixed orb,
+  theme, keyboard and version-reservation checks.
+- Shared labels use project-relative paths, versioned JSON, exclusive locks,
+  atomic replacement and stale-edit checks. Tests cover offline cache, read-only
+  storage, corrupt metadata and successful-save-only inheritance.
+- Two independent processes with separate preference caches competed on Relay.
+  One write completed and one was rejected; a subsequent stale edit was rejected.
+  This is one workstation, not a two-workstation pilot.
+- Fresh Blender 5.2.1 and Photoshop 27.6.0 QA document saves/reopens passed with
+  unsaved changes preserved and explicit stage inheritance. After Effects was
+  launched for a QA-only retest but exited without establishing its CEP transport;
+  its new stage-inheritance host check is unverified. Earlier AE save evidence
+  remains historical and is not counted as a fresh 0.5.0 host check.
+- Native Qt captures cover the five desktop pages, project grid, named versions,
+  stages and files in both themes at actual DPR 1.0, 1.5 and 2.0, plus minimum size.
+  Cards keep 24 px outer insets and 20 px gaps; labels are no longer perspective
+  transformed. Full paths wrap inside a read-only details view. Application logos
+  remain unchanged; bounded hover artwork prevents clipping.
+- Four stage icons were generated individually with the built-in image tool,
+  visually reviewed, and alpha-checked. Full prompts ship in assets/stage-icons.
+  The original template placeholder was added without replacing any project icon.
+- Workflows navigation, Home tile, settings, editor construction and execution
+  wiring are removed. The portable build omits graph.py, graph_ui.py and examples.
+  Existing shared graph documents and activity history are preserved.
+- A real Qt motion responsiveness check recorded a 16 ms median and 30 ms p95
+  timer gap. The 452 ms maximum includes page/layout work; it is not a GPU FPS
+  measurement. Reduced-motion and interrupted navigation checks pass.
+
 ## Remaining host/environment checks
 
 - A true two-workstation pilot has not been run. The SMB concurrency test used

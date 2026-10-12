@@ -54,7 +54,7 @@ def hover(widget, enter):
         event = QEvent(QEvent.Leave)
     app.sendEvent(widget, event)
 
-tiles = [tile for tile in window.pages['Home'].findChildren(GradientTile) if tile.tone in ('Projects','Workflows','Favorites')]
+tiles = [tile for tile in window.pages['Home'].findChildren(GradientTile) if tile.tone in ('Projects','Favorites')]
 frames, times, events = [], [], []
 clock = QElapsedTimer()
 
@@ -66,18 +66,20 @@ project_control = next(b for b in tiles[0].findChildren(MotionButton) if b.text(
 actions = [(0, lambda: window.navigate('Home'), 'Staggered Home reveal'),
            (1000, lambda: (hover(tiles[0], True), tiles[0].track_pointer(tiles[0].rect().center())), 'Project tile expansion'),
            (1600, lambda: tiles[0].track_pointer(tiles[0].rect().topRight()), 'Pointer lighting and artwork parallax'),
-           (2300, lambda: (hover(tiles[0], False), hover(tiles[1], True)), 'Workflow tile spring'),
+           (2300, lambda: (hover(tiles[0], False), hover(tiles[1], True)), 'Favorites tile spring'),
            (3000, lambda: (hover(tiles[1], False), window.toggle_sidebar()), 'Sidebar collapse'),
            (3700, lambda: QTest.mouseClick(project_control, Qt.LeftButton), 'Tile-to-page expansion'),
-           (4800, lambda: window.project_cards.scroll_to(0), 'Project shelf depth and edge fade'),
-           (5700, lambda: window.project_cards.scroll_to(2), 'Project shelf spring scroll'),
+           (4800, lambda: window.project_cards.scroll_to(0), 'Uniform project grid'),
+           (5700, lambda: window.project_cards.scroll_to(2), 'Project grid scroll'),
            (6500, lambda: window.open_project(str(project)), 'Project scan and file card gallery'),
-           (7400, lambda: window.file_cards.selectRow(0), 'File card selection and details'),
+           (7000, lambda: window.choice_selected(next((i for i,e in enumerate(window.choice_cards.entries) if e['path']!='General'),0)), 'Choose campaign version'),
+           (7300, lambda: window.choice_selected(next((i for i,e in enumerate(window.choice_cards.entries) if e['path']=='lighting'),0)), 'Choose Lighting stage'),
+           (7800, lambda: window.file_cards.selectRow(0), 'File list selection and details'),
            (8000, lambda: QTest.mouseMove(window.file_cards,window.file_cards.rect().center()), 'Card hover depth'),
-           (9000, lambda: window.file_cards.scroll_to(window.file_cards.limit()), 'File gallery scrolling'),
+           (9000, lambda: window.file_cards.scrollToBottom(), 'File gallery scrolling'),
            (9800, lambda: window.file_cards.selectRow(window.file_cards.rowCount()-1), 'Last file card'),
            (10800, lambda: window.file_cards.selectRow(0), 'Keyboard-style return to first card'),
-           (11700, lambda: window.navigate('Workflows'), 'Directional workflow transition'),
+           (11700, lambda: window.navigate('Activity'), 'Directional activity transition'),
            (12500, window.toggle_sidebar, 'Sidebar expand'),
            (13200, lambda: window.navigate('Home'), 'Return and staggered introduction'),
            (14300, busy, 'Task orb morph and dual progress ring'),
