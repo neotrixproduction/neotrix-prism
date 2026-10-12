@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBox
 from . import __version__, apps, indexer, graph
 from .storage import Settings, GraphLibrary, user_dir, atomic_json, read_json, history, activity
 from .design import icon, stylesheet, fade, palette, native_theme
+from .surfaces import Atmosphere, GradientTile, WorkspaceArt
 from .graph_ui import GraphEditor
 
 
@@ -82,10 +83,10 @@ class MainWindow(QMainWindow):
         self.projects, self.files, self.display_files, self.jobs = [], [], [], []
         self.project, self.preview = None, None
         self.setWindowTitle("Neotrix Prism")
-        self.setWindowIcon(icon("Workflows"))
+        self.setWindowIcon(icon("Brand"))
         self.resize(1360, 900)
         self.setMinimumSize(1024, 720)
-        central = QWidget()
+        central = Atmosphere()
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -98,7 +99,8 @@ class MainWindow(QMainWindow):
         nav_layout.setSpacing(8)
         brand = QHBoxLayout()
         mark = QLabel()
-        mark.setPixmap(icon("Workflows", 37).pixmap(37, 37))
+        mark.setFixedSize(37, 37)
+        mark.setPixmap(icon("Brand", 37).pixmap(37, 37))
         brand.addWidget(mark)
         brand.addWidget(label("NEOTRIX\nPrism", "section"))
         nav_layout.addLayout(brand)
@@ -179,8 +181,14 @@ class MainWindow(QMainWindow):
 
     def apply_theme(self):
         dark = self.settings.data["theme"] == "dark"
+        self.centralWidget().dark = dark
+        self.centralWidget().update()
         QApplication.instance().setPalette(palette(dark))
         self.setStyleSheet(stylesheet(dark))
+        for scroll in self.findChildren(QScrollArea):
+            scroll.viewport().setAutoFillBackground(False)
+            if scroll.widget():
+                scroll.widget().setAutoFillBackground(False)
         self.editor.dark = dark
         self.editor.view.viewport().update()
         for item in self.editor.items.values():
@@ -219,14 +227,13 @@ class MainWindow(QMainWindow):
         layout.setSizeConstraint(QLayout.SetMinimumSize)
         scroll.setWidget(content)
         outer.addWidget(scroll)
-        hero = QFrame()
-        hero.setObjectName("hero")
+        hero = GradientTile("hero")
         hero_layout = QHBoxLayout(hero)
         hero_layout.setContentsMargins(28, 28, 28, 28)
         left = QVBoxLayout()
-        left.addWidget(label("A LITTLE LESS SEARCHING. A LOT MORE CREATING.", "eyebrow"))
-        left.addWidget(label("Your next idea starts here.", "title"))
-        left.addWidget(label("A calm home for every project, application and working version.", "subtitle", True))
+        left.addWidget(label("NEOTRIX CREATIVE WORKSPACE", "eyebrow"))
+        left.addWidget(label("Ready for your next idea.", "title", True))
+        left.addWidget(label("Every project. Every creative tool.\nOne beautiful place to pick up where you left off.", "subtitle", True))
         left.addSpacing(10)
         row = QHBoxLayout()
         row.addWidget(button("Explore projects", lambda: self.navigate("Projects"), True))
@@ -234,20 +241,25 @@ class MainWindow(QMainWindow):
         row.addStretch()
         left.addLayout(row)
         hero_layout.addLayout(left, 1)
-        illustration = QLabel()
-        illustration.setPixmap(icon("Projects", 128).pixmap(128, 128))
+        illustration = WorkspaceArt()
         hero_layout.addWidget(illustration)
         layout.addWidget(hero)
         overview = QHBoxLayout()
         for name, title, description in (
             ("Projects", "All your projects", "Browse working files across every creative application."),
-            ("Workflows", "Small steps, big time saved", "Collect and open files with reusable visual workflows."),
-            ("Favorites", "Keep the good stuff close", "Pin projects and files so they're always one click away.")):
-            frame, inner = card()
+            ("Workflows", "Make work flow", "Collect and open files with reusable visual workflows."),
+            ("Favorites", "Your best, on hand", "Keep favorite projects and files one click away.")):
+            frame = GradientTile(name)
+            inner = QVBoxLayout(frame)
+            inner.setContentsMargins(22, 18, 22, 20)
+            inner.setSpacing(10)
+            top = QHBoxLayout()
+            top.addWidget(label({"Projects": "PROJECT LIBRARY", "Workflows": "VISUAL WORKFLOWS", "Favorites": "FAVORITES"}[name], "eyebrow"), 1)
             item = QLabel()
-            item.setFixedSize(50, 50)
-            item.setPixmap(icon(name, 50).pixmap(50, 50))
-            inner.addWidget(item)
+            item.setFixedSize(78, 78)
+            item.setPixmap(icon(name, 78).pixmap(78, 78))
+            top.addWidget(item)
+            inner.addLayout(top)
             inner.addWidget(label(title, "section", True))
             inner.addWidget(label(description, "subtitle", True))
             inner.addStretch()

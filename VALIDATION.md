@@ -1,4 +1,4 @@
-# Validation — Neotrix Prism 0.1.0 preview
+# Validation — Neotrix Prism 0.1.1 preview
 
 ## Verified on this workstation
 
@@ -24,6 +24,17 @@
   succeeded, the competing reservation was blocked. Shared graph stale-write
   detection also passed.
 
+## 0.1.1 visual revision
+
+- All 18 existing automated service, integration and UI tests pass.
+- Replaced flat surfaces with static vector gradients, luminous tiles, shaded
+  original icons, an original prism mark and layered workspace artwork.
+- Native desktop captures cover all six pages at 100%, 150% and 200%, light/dark,
+  reduced motion and the 1024 x 720 minimum window.
+- Static gradients have no refresh timer; SVG icons are cached and supersampled.
+- Adobe panel CSS and integration packages were updated. This revision's live
+  AE panel refresh was blocked by a pre-existing host save prompt; updated AE
+  panel rendering and Photoshop UXP rendering require host verification.
 ## Remaining host/environment checks
 
 - A true two-workstation pilot has not been run. The SMB concurrency test used

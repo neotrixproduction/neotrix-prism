@@ -4,8 +4,9 @@ A Windows creative-project workspace built on the open-source Prism Pipeline.
 Browse existing project folders across Blender, Illustrator, Photoshop, After
 Effects and Fusion, save working versions, and connect reusable file workflows.
 
-The interface uses original Neotrix artwork, rounded tiles, colorful icons and
-lightweight motion inspired by the current CleanMyMac design.
+The interface uses a purple-to-indigo gradient hero, luminous translucent tiles,
+dimensional original icons and lightweight motion inspired by the current
+CleanMyMac design. Light and dark themes share the same visual system.
 
 ![Neotrix workspace](docs/screenshots/home.png)
 ![Working files across applications](docs/screenshots/projects.png)

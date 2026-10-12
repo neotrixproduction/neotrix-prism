@@ -1,4 +1,5 @@
 """Shared Neotrix design tokens, original SVG icons and lightweight animation."""
+from functools import lru_cache
 from PySide6.QtCore import QByteArray, Qt, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QPalette, QColor
 from PySide6.QtSvg import QSvgRenderer
@@ -23,29 +24,50 @@ PATHS = {
 }
 
 
+@lru_cache(maxsize=128)
 def icon(name, size=48):
     color = COLORS.get(name, "#8875f0")
     drawing = PATHS.get(name, PATHS["Projects"])
-    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="' + color + '"/><stop offset="1" stop-color="' + color + '" stop-opacity=".76"/></linearGradient></defs><rect x="1" y="1" width="62" height="62" rx="18" fill="url(#g)"/><g fill="white">' + drawing + '</g></svg>'
-    pixmap = QPixmap(size, size)
+    light, deep = QColor(color).lighter(145).name(), QColor(color).darker(170).name()
+    definitions = '<defs><linearGradient id="body" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="' + light + '"/><stop offset=".42" stop-color="' + color + '"/><stop offset="1" stop-color="' + deep + '"/></linearGradient><linearGradient id="face" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fff5d7"/><stop offset="1" stop-color="#f7b756"/></linearGradient><linearGradient id="shine" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="white" stop-opacity=".7"/><stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient></defs>'
+    if name == "Brand":
+        art = '<path d="M32 3L57 18V47L32 62 7 47V18Z" fill="url(#body)" stroke="#e5ccff" stroke-width=".7"/><path d="M32 3V32L7 18Z" fill="#e9c2ff"/><path d="M32 32L57 18V47L32 62Z" fill="#7029a2"/><path d="M32 32L7 18V47L32 62Z" fill="#bc6cde"/><path d="M32 6V31L10 18" fill="none" stroke="white" stroke-opacity=".6" stroke-width="1.3"/>'
+    elif name == "Projects":
+        art = '<path d="M6 17Q6 11 12 11H26L33 19H53Q59 19 59 25V51Q59 57 53 57H12Q6 57 6 51Z" fill="url(#body)"/><rect x="14" y="23" width="38" height="24" rx="3" fill="#fff3df" transform="rotate(-6 32 32)"/><path d="M8 31Q8 26 14 26H55Q61 26 60 32L56 52Q55 57 49 57H12Q7 57 7 52Z" fill="url(#face)" stroke="#fff0c1" stroke-width=".8"/><path d="M14 29H54" stroke="white" stroke-opacity=".75" stroke-linecap="round"/>'
+    elif name == "Favorites":
+        art = '<g fill="' + deep + '" transform="translate(0 3)">' + drawing + '</g><g fill="url(#body)" stroke="#ffc1df" stroke-width=".6">' + drawing + '</g><path d="M32 14L27 26 15 29" fill="none" stroke="white" stroke-opacity=".6" stroke-width="2" stroke-linecap="round"/>'
+    else:
+        art = '<rect x="5" y="7" width="54" height="54" rx="17" fill="' + deep + '"/><rect x="5" y="3" width="54" height="54" rx="17" fill="url(#body)"/><rect x="6" y="4" width="52" height="52" rx="16" fill="none" stroke="url(#shine)" stroke-width="1.5"/><g transform="translate(9 7) scale(.72)" fill="#1f1145" opacity=".24">' + drawing + '</g><g transform="translate(9 5) scale(.72)" fill="#fffaff">' + drawing + '</g>'
+    svg = '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="-8 -8 80 80">' + definitions + '<ellipse cx="33" cy="61" rx="24" ry="4" fill="#211040" opacity=".12"/>' + art + '</svg>'
+    # Supersample original vectors so labels remain sharp on high-DPI Windows.
+    pixmap = QPixmap(size * 2, size * 2)
     pixmap.fill(Qt.transparent)
     painter = QPainter(pixmap)
     QSvgRenderer(QByteArray(svg.encode())).render(painter)
     painter.end()
+    pixmap.setDevicePixelRatio(2)
     return QIcon(pixmap)
 
 
 def stylesheet(dark=False):
     bg, card, text, muted, edge, selected = (
-        ("#191c29", "#25293a", "#f2f1fa", "#b1b3cb", "#383d52", "#3c365a") if dark else
-        ("#f5f4fb", "#ffffff", "#292a40", "#777b93", "#e7e6f2", "#eee9fc"))
+        ("#19172e", "#28233d", "#f7f1ff", "#bdb2d1", "#49415f", "#49325f") if dark else
+        ("#eeeafa", "#faf8ff", "#302342", "#766885", "#e0d8ee", "#e6d7f6"))
     return """
     QWidget {color: TEXT; font-family: 'Segoe UI'; font-size: 13px;}
     QMainWindow, QDialog {background: BG;}
-    QWidget#sidebar {background: CARD; border-right:1px solid EDGE;}
-    QFrame#card {background:CARD; border:1px solid EDGE; border-radius:20px;}
-    QFrame#hero {background: SELECTED; border:1px solid EDGE; border-radius:24px;}
-    QLabel#title {font-size:32px; font-weight:650; letter-spacing:-1px;}
+    QWidget#sidebar {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 CARD,stop:1 BG); border-right:1px solid EDGE;}
+    QFrame#card {background:qlineargradient(x1:0,y1:0,x2:.8,y2:1,stop:0 CARD,stop:1 BG); border:1px solid EDGE; border-radius:20px;}
+    QFrame#hero, QFrame#featureTile {background:transparent; border:none;}
+    QFrame#hero QLabel, QFrame#featureTile QLabel {color:#ffffff; background:transparent;}
+    QFrame#hero QLabel#subtitle, QFrame#featureTile QLabel#subtitle {color:#e7d5f5;}
+    QFrame#hero QLabel#eyebrow, QFrame#featureTile QLabel#eyebrow {color:#e3c1f3; font-size:10px; letter-spacing:1px;}
+    QFrame#hero QLabel#title {font-size:29px; font-weight:600;}
+    QFrame#featureTile QLabel#section {font-size:21px; font-weight:600;}
+    QFrame#hero QPushButton, QFrame#featureTile QPushButton {background:rgba(255,255,255,22); color:white; border:1px solid rgba(255,255,255,35);}
+    QFrame#hero QPushButton:hover, QFrame#featureTile QPushButton:hover {background:rgba(255,255,255,42); border-color:rgba(255,255,255,75);}
+    QFrame#hero QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #fff7ff,stop:1 #e5d2ff);color:#4c257b;border:1px solid #fff7ff;}
+    QLabel#title {font-size:30px; font-weight:600; letter-spacing:-1px;}
     QLabel#subtitle {color:MUTED; font-size:14px;}
     QLabel#section {font-size:18px; font-weight:600;}
     QLabel#eyebrow {color:#8875f0; font-size:11px; font-weight:700; letter-spacing:2px;}
@@ -53,13 +75,14 @@ def stylesheet(dark=False):
     QPushButton:hover {background:SELECTED; border-color:#c2b6ec;}
     QPushButton:pressed {background:#ddd4f5; color:#37304d;}
     QPushButton:focus, QLineEdit:focus, QComboBox:focus {border:2px solid #8a75ea;}
-    QPushButton#primary {background:#8875ed; color:white; border:none;}
-    QPushButton#primary:hover {background:#7966de;}
+    QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ae57ce,stop:.48 #8651c2,stop:1 #6040a4); color:white; border:1px solid #b07ad4;}
+    QPushButton#primary:hover {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #c16ade,stop:1 #7550ba);}
     QPushButton#primary:disabled {background:#c5bce7; color:white;}
     QPushButton#nav {text-align:left; border:none; padding:12px; border-radius:12px; background:transparent;}
-    QPushButton#nav:checked {background:SELECTED; color:#917dea;}
+    QPushButton#nav:checked {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ac61d0,stop:1 #7044ae); color:white; border:1px solid #bb87d8;}
     QPushButton#nav:hover {background:SELECTED;}
-    QPushButton#projectCard {text-align:left; padding:20px; background:CARD; border:1px solid EDGE; border-radius:20px; font-size:16px;}
+    QPushButton#projectCard {text-align:left; padding:20px; background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 CARD,stop:1 BG); border:1px solid EDGE; border-radius:20px; font-size:16px;}
+    QPushButton#projectCard:hover {background:SELECTED;border-color:#b79bd8;}
     QPushButton:disabled {color:MUTED; background:BG;}
     QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {background:CARD; border:1px solid EDGE; border-radius:9px; padding:8px; selection-background-color:#8875ed;}
     QComboBox::drop-down {border:none; width:22px;}

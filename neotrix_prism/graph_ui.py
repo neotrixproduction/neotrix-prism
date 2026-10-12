@@ -4,7 +4,7 @@ import json
 import uuid
 from pathlib import Path
 from PySide6.QtCore import Qt, QRectF, QPointF, Signal
-from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QPainterPath
+from PySide6.QtGui import QPainter, QColor, QPen, QBrush, QPainterPath, QLinearGradient
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QGraphicsView,
     QGraphicsScene, QGraphicsObject, QGraphicsPathItem, QGraphicsItem, QSplitter, QFormLayout, QLineEdit,
     QLabel, QMessageBox, QFileDialog, QListWidget)
@@ -33,7 +33,10 @@ class NodeItem(QGraphicsObject):
 
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.setBrush(QColor("#292d42" if self.editor.dark else "#ffffff"))
+        surface = QLinearGradient(0, 0, 205, 116)
+        surface.setColorAt(0, QColor("#41314f" if self.editor.dark else "#ffffff"))
+        surface.setColorAt(1, QColor("#25253d" if self.editor.dark else "#eee4fa"))
+        painter.setBrush(QBrush(surface))
         painter.setPen(QPen(QColor("#9c87ed" if self.isSelected() else "#d5d3e7"), 2 if self.isSelected() else 1))
         painter.drawRoundedRect(self.boundingRect().adjusted(1, 1, -1, -1), 15, 15)
         painter.setPen(QColor("#eeeafa" if self.editor.dark else "#34324b"))
@@ -156,7 +159,10 @@ class GraphView(QGraphicsView):
             super().keyPressEvent(event)
 
     def drawBackground(self, painter, rect):
-        painter.fillRect(rect, QColor("#1d2030" if self.editor.dark else "#f5f4fb"))
+        background = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        background.setColorAt(0, QColor("#241e35" if self.editor.dark else "#eee4f9"))
+        background.setColorAt(1, QColor("#161e30" if self.editor.dark else "#e3eafa"))
+        painter.fillRect(rect, background)
         painter.setPen(QPen(QColor("#36374e" if self.editor.dark else "#ddd9ed"), 1))
         start_x, start_y = int(rect.left()) // 24 * 24, int(rect.top()) // 24 * 24
         for x in range(start_x, int(rect.right()), 24):

@@ -10,7 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_integrations import build
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGE = ROOT / "dist" / "Neotrix-Prism-0.1.0-Windows"
+sys.path.insert(0, str(ROOT))
+from neotrix_prism import __version__
+PACKAGE = ROOT / "dist" / ("Neotrix-Prism-" + __version__ + "-Windows")
 
 
 def main():
@@ -41,7 +43,7 @@ def main():
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(file, target)
     (licenses / "packages.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
-    archive = ROOT / "dist/Neotrix-Prism-0.1.0-Windows.zip"
+    archive = ROOT / "dist" / (PACKAGE.name + ".zip")
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, compresslevel=5) as package:
         for file in PACKAGE.rglob("*"):
             if file.is_file():
