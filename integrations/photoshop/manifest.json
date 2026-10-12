@@ -1,7 +1,7 @@
 {
   "id": "com.neotrix.prism.photoshop",
   "name": "Neotrix Prism",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "manifestVersion": 5,
   "main": "index.html",
   "host": [{"app":"PS","minVersion":"27.0.0"}],

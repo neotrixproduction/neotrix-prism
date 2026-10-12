@@ -49,15 +49,19 @@ def icon(name, size=48):
     return QIcon(pixmap)
 
 
+def theme_tokens(dark=False):
+    """Both appearances use colored surfaces; midnight reduces their luminance."""
+    return (("#211447", "#342451", "#fff8ff", "#d3c4e3", "#5c437c", "#604080") if dark else
+            ("#422273", "#573683", "#fffaff", "#e2cfee", "#8863a3", "#7951a5"))
+
+
 def stylesheet(dark=False):
-    bg, card, text, muted, edge, selected = (
-        ("#19172e", "#28233d", "#f7f1ff", "#bdb2d1", "#49415f", "#49325f") if dark else
-        ("#eeeafa", "#faf8ff", "#302342", "#766885", "#e0d8ee", "#e6d7f6"))
+    bg, card, text, muted, edge, selected = theme_tokens(dark)
     return """
     QWidget {color: TEXT; font-family: 'Segoe UI'; font-size: 13px;}
     QMainWindow, QDialog {background: BG;}
-    QWidget#sidebar {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 CARD,stop:1 BG); border-right:1px solid EDGE;}
-    QFrame#card {background:qlineargradient(x1:0,y1:0,x2:.8,y2:1,stop:0 CARD,stop:1 BG); border:1px solid EDGE; border-radius:20px;}
+    QWidget#sidebar {background:rgba(27,10,58,45); border-right:1px solid rgba(255,255,255,24);}
+    QFrame#card {background:qlineargradient(x1:0,y1:0,x2:.8,y2:1,stop:0 CARD,stop:1 BG); border:1px solid rgba(255,255,255,35); border-radius:20px;}
     QFrame#hero, QFrame#featureTile {background:transparent; border:none;}
     QFrame#hero QLabel, QFrame#featureTile QLabel {color:#ffffff; background:transparent;}
     QFrame#hero QLabel#subtitle, QFrame#featureTile QLabel#subtitle {color:#e7d5f5;}
@@ -66,18 +70,18 @@ def stylesheet(dark=False):
     QFrame#featureTile QLabel#section {font-size:21px; font-weight:600;}
     QFrame#hero QPushButton, QFrame#featureTile QPushButton {background:rgba(255,255,255,22); color:white; border:1px solid rgba(255,255,255,35);}
     QFrame#hero QPushButton:hover, QFrame#featureTile QPushButton:hover {background:rgba(255,255,255,42); border-color:rgba(255,255,255,75);}
-    QFrame#hero QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #fff7ff,stop:1 #e5d2ff);color:#4c257b;border:1px solid #fff7ff;}
+    QFrame#hero QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #d25bdd,stop:1 #8c37bb);color:white;border:1px solid #df8fec;}
     QLabel#title {font-size:30px; font-weight:600; letter-spacing:-1px;}
     QLabel#subtitle {color:MUTED; font-size:14px;}
     QLabel#section {font-size:18px; font-weight:600;}
-    QLabel#eyebrow {color:#8875f0; font-size:11px; font-weight:700; letter-spacing:2px;}
+    QLabel#eyebrow {color:#e2b7f4; font-size:11px; font-weight:700; letter-spacing:2px;}
     QPushButton {background:CARD; border:1px solid EDGE; border-radius:10px; padding:9px 15px; font-weight:550;}
     QPushButton:hover {background:SELECTED; border-color:#c2b6ec;}
-    QPushButton:pressed {background:#ddd4f5; color:#37304d;}
+    QPushButton:pressed {background:#79489e; color:white;}
     QPushButton:focus, QLineEdit:focus, QComboBox:focus {border:2px solid #8a75ea;}
     QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ae57ce,stop:.48 #8651c2,stop:1 #6040a4); color:white; border:1px solid #b07ad4;}
     QPushButton#primary:hover {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #c16ade,stop:1 #7550ba);}
-    QPushButton#primary:disabled {background:#c5bce7; color:white;}
+    QPushButton#primary:disabled {background:#624575; color:#d3c4e3;}
     QPushButton#nav {text-align:left; border:none; padding:12px; border-radius:12px; background:transparent;}
     QPushButton#nav:checked {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ac61d0,stop:1 #7044ae); color:white; border:1px solid #bb87d8;}
     QPushButton#nav:hover {background:SELECTED;}
@@ -90,6 +94,7 @@ def stylesheet(dark=False):
     QTableWidget, QListWidget, QTreeWidget {background:CARD; border:1px solid EDGE; border-radius:12px; gridline-color:EDGE; alternate-background-color:BG; selection-background-color:SELECTED; selection-color:TEXT;}
     QTableWidget::item {padding:8px; border-bottom:1px solid EDGE;}
     QHeaderView::section {background:BG; color:MUTED; border:none; padding:10px; font-weight:600;}
+    QHeaderView {background:BG;}
     QScrollArea, QStackedWidget {background:transparent; border:none;}
     QSplitter::handle {background:BG; width:9px;}
     QGraphicsView {border:1px solid EDGE; border-radius:12px;}
@@ -100,7 +105,10 @@ def stylesheet(dark=False):
     QMenu::item {padding:8px 20px; border-radius:6px;}
     QMenu::item:selected {background:SELECTED;}
     QScrollBar:vertical {background:transparent; width:8px; margin:0;}
-    QScrollBar::handle:vertical {background:#c0bbd4; border-radius:4px; min-height:28px;}
+    QScrollBar::handle:vertical {background:#956dac; border-radius:4px; min-height:28px;}
+    QScrollBar:horizontal {background:BG; height:8px;}
+    QScrollBar::handle:horizontal {background:#956dac; border-radius:4px; min-width:28px;}
+    QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {width:0;}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {height:0;}
     QProgressBar {background:EDGE; border:none; border-radius:4px; max-height:7px; text-align:center;}
     QProgressBar::chunk {background:#8875ed; border-radius:4px;}
@@ -112,23 +120,22 @@ def stylesheet(dark=False):
 
 def palette(dark=False):
     result = QPalette()
-    for role, color in ((QPalette.Window, "#191c29" if dark else "#f5f4fb"),
-                        (QPalette.Base, "#25293a" if dark else "#ffffff"),
-                        (QPalette.WindowText, "#f2f1fa" if dark else "#292a40"),
-                        (QPalette.Text, "#f2f1fa" if dark else "#292a40"),
-                        (QPalette.Button, "#25293a" if dark else "#ffffff"),
-                        (QPalette.ButtonText, "#f2f1fa" if dark else "#292a40"),
-                        (QPalette.Highlight, "#8875ed"), (QPalette.HighlightedText, "#ffffff")):
+    bg, card, text, muted, edge, selected = theme_tokens(dark)
+    for role, color in ((QPalette.Window, bg), (QPalette.Base, card),
+                        (QPalette.AlternateBase, bg), (QPalette.WindowText, text),
+                        (QPalette.Text, text), (QPalette.Button, card),
+                        (QPalette.ButtonText, text), (QPalette.PlaceholderText, muted),
+                        (QPalette.Highlight, selected), (QPalette.HighlightedText, text)):
         result.setColor(role, QColor(color))
+    for role in (QPalette.WindowText, QPalette.Text, QPalette.ButtonText):
+        result.setColor(QPalette.Disabled, role, QColor(muted))
     return result
 
 
 def native_theme(widget, dark=False):
     """Clear upstream inline dark styles before applying shared light/dark tokens."""
     from PySide6.QtWidgets import QWidget
-    foreground = "#f2f1fa" if dark else "#292a40"
-    background = "#191c29" if dark else "#f5f4fb"
-    surface = "#25293a" if dark else "#ffffff"
+    background, surface, foreground, _, _, _ = theme_tokens(dark)
     for child in [widget] + widget.findChildren(QWidget):
         child.setStyleSheet("")
         child.setPalette(palette(dark))

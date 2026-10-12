@@ -34,12 +34,12 @@ class NodeItem(QGraphicsObject):
     def paint(self, painter, option, widget=None):
         painter.setRenderHint(QPainter.Antialiasing)
         surface = QLinearGradient(0, 0, 205, 116)
-        surface.setColorAt(0, QColor("#41314f" if self.editor.dark else "#ffffff"))
-        surface.setColorAt(1, QColor("#25253d" if self.editor.dark else "#eee4fa"))
+        surface.setColorAt(0, QColor("#41314f" if self.editor.dark else "#79509d"))
+        surface.setColorAt(1, QColor("#25253d" if self.editor.dark else "#422775"))
         painter.setBrush(QBrush(surface))
-        painter.setPen(QPen(QColor("#9c87ed" if self.isSelected() else "#d5d3e7"), 2 if self.isSelected() else 1))
+        painter.setPen(QPen(QColor("#e1adff" if self.isSelected() else "#9673b4"), 2 if self.isSelected() else 1))
         painter.drawRoundedRect(self.boundingRect().adjusted(1, 1, -1, -1), 15, 15)
-        painter.setPen(QColor("#eeeafa" if self.editor.dark else "#34324b"))
+        painter.setPen(QColor("#fff5ff"))
         font = painter.font()
         font.setBold(True)
         painter.setFont(font)
@@ -56,7 +56,7 @@ class NodeItem(QGraphicsObject):
                 point = self.port_pos(port, direction)
                 painter.setBrush(QColor(PORT_COLORS[kind]))
                 painter.drawEllipse(point, 6, 6)
-                painter.setPen(QColor("#aaa5bf" if self.editor.dark else "#78738f"))
+                painter.setPen(QColor("#cbb5dd" if self.editor.dark else "#e5d0f4"))
                 painter.drawText(QRectF(14, point.y() - 9, 178, 20),
                                  Qt.AlignLeft if direction == "inputs" else Qt.AlignRight, port)
                 painter.setPen(Qt.NoPen)
@@ -160,10 +160,10 @@ class GraphView(QGraphicsView):
 
     def drawBackground(self, painter, rect):
         background = QLinearGradient(rect.topLeft(), rect.bottomRight())
-        background.setColorAt(0, QColor("#241e35" if self.editor.dark else "#eee4f9"))
-        background.setColorAt(1, QColor("#161e30" if self.editor.dark else "#e3eafa"))
+        background.setColorAt(0, QColor("#241e35" if self.editor.dark else "#4c267c"))
+        background.setColorAt(1, QColor("#161e30" if self.editor.dark else "#291b57"))
         painter.fillRect(rect, background)
-        painter.setPen(QPen(QColor("#36374e" if self.editor.dark else "#ddd9ed"), 1))
+        painter.setPen(QPen(QColor("#36374e" if self.editor.dark else "#6b4392"), 1))
         start_x, start_y = int(rect.left()) // 24 * 24, int(rect.top()) // 24 * 24
         for x in range(start_x, int(rect.right()), 24):
             for y in range(start_y, int(rect.bottom()), 24):

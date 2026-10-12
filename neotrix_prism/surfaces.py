@@ -10,13 +10,13 @@ class Atmosphere(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         base = QLinearGradient(0, 0, self.width(), self.height())
-        stops = [(0, "#241339"), (.45, "#19172e"), (1, "#10192b")] if self.dark else [(0, "#eedcf8"), (.45, "#efebfa"), (1, "#e3eafa")]
+        stops = [(0, "#4a1b65"), (.45, "#271447"), (1, "#100f32")] if self.dark else [(0, "#822799"), (.43, "#4b217e"), (1, "#160f48")]
         for position, color in stops:
             base.setColorAt(position, QColor(color))
         p.fillRect(self.rect(), base)
-        glow = QRadialGradient(self.width() * .8, self.height() * .15, self.width() * .7)
-        glow.setColorAt(0, QColor(159, 89, 227, 50 if self.dark else 35))
-        glow.setColorAt(1, QColor(159, 89, 227, 0))
+        glow = QRadialGradient(self.width() * .3, self.height() * .88, self.width() * .65)
+        glow.setColorAt(0, QColor(145, 44, 215, 60 if self.dark else 95))
+        glow.setColorAt(1, QColor(145, 44, 215, 0))
         p.fillRect(self.rect(), glow)
 
 

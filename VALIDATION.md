@@ -1,4 +1,4 @@
-# Validation — Neotrix Prism 0.1.1 preview
+# Validation — Neotrix Prism 0.1.2 preview
 
 ## Verified on this workstation
 
@@ -35,6 +35,15 @@
 - Adobe panel CSS and integration packages were updated. This revision's live
   AE panel refresh was blocked by a pre-existing host save prompt; updated AE
   panel rendering and Photoshop UXP rendering require host verification.
+## 0.1.2 full-color background
+
+- Removed pale/white shell surfaces. Both appearances use purple/indigo
+  backgrounds with white text, tinted tables, forms, sidebar and workflow nodes.
+- Shared Qt palette and native Prism dialog colors match the desktop tokens,
+  including placeholders and disabled text.
+- All 18 tests pass. Native captures cover all six desktop pages at 100%, 150%
+  and 200%, both appearances, reduced motion and the minimum window size.
+
 ## Remaining host/environment checks
 
 - A true two-workstation pilot has not been run. The SMB concurrency test used
