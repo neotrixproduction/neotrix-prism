@@ -59,6 +59,25 @@
   200%, reduced motion and the minimum window size.
 - Adobe panel animation sources were updated; live host rendering is pending.
 
+## 0.3.0 choreographed motion
+
+- 25 automated tests pass. New coverage checks actual home tile navigation,
+  repeated scene interruption and reduced motion enabled during a transition.
+- Original Manrope typography, rounded window and creative-file services remain.
+- All six desktop pages were captured in both appearances at 100%, 150% and
+  200%; minimum-window capture confirms wrapping and vertical scrolling. All
+  nine UI tests also pass at 200% scaling.
+- Motion recording uses real Qt widgets and labeled local QA tasks. No production
+  files are opened or changed. A separate 16 ms event-loop probe records scheduling
+  gaps without screenshot/encoding overhead; this is not a GPU frame-rate claim.
+- The local probe recorded 16 ms median and 18 ms p95 scheduling gaps. Its
+  maximum was 211 ms, including initial/navigation work; no 60 fps guarantee is
+  inferred. The MP4 preserves original RGB captures and their timestamps,
+  avoiding the GIF's limited gradient palette.
+- Surface and icon motion is driven by interactions and finishes at rest. Only
+  real task progress loops. Adobe CSS adds a finite sweep and perspective hover;
+  this revision's live Adobe panel rendering remains pending.
+
 ## Remaining host/environment checks
 
 - A true two-workstation pilot has not been run. The SMB concurrency test used

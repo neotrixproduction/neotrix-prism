@@ -192,3 +192,29 @@ def test_bento_fits_minimum_window(window):
     QTest.qWait(100)
     scroll = window.pages['Home'].findChild(QScrollArea)
     assert scroll.horizontalScrollBar().maximum() == 0
+
+
+def test_tile_scene_transition_interrupt_and_reduce(window):
+    from neotrix_prism.surfaces import GradientTile
+    from neotrix_prism.motion import SceneTransition, MotionButton
+    from PySide6.QtCore import QAbstractAnimation, QVariantAnimation
+    window, project, messages, wait = window
+    window.settings.data['reduced_motion'] = False
+    window.navigate('Home')
+    QTest.qWait(800)
+    tile = next(t for t in window.pages['Home'].findChildren(GradientTile) if t.tone == 'Projects')
+    control = next(b for b in tile.findChildren(MotionButton) if b.text() == 'Open projects')
+    QTest.mouseClick(control, Qt.LeftButton)
+    transition = window._scene_transition
+    assert transition.origin is not None
+    assert transition.isVisible()
+    assert window.stack.currentWidget() is window.pages['Projects']
+    window.navigate('Workflows')
+    window.navigate('Settings')
+    window.settings.data['reduced_motion'] = True
+    window.apply_theme()
+    QTest.qWait(50)
+    assert not any(t.isVisible() for t in window.findChildren(SceneTransition))
+    assert all(a.state() == QAbstractAnimation.Stopped for a in window.findChildren(QVariantAnimation))
+    assert window.stack.currentWidget() is window.pages['Settings']
+    assert not messages

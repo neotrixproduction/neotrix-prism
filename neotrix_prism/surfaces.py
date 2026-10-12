@@ -1,5 +1,5 @@
-"""Static, resolution-independent gradient surfaces; no repaint timer or blur layers."""
-from PySide6.QtCore import QRectF, Qt, QEasingCurve, Signal
+"""Resolution-independent surfaces with finite, interaction-driven lighting."""
+from PySide6.QtCore import QRectF, Qt, QEasingCurve, Signal, QPointF, QEvent, QTimer
 from PySide6.QtGui import QColor, QPainter, QLinearGradient, QRadialGradient, QPainterPath, QPen, QRegion
 from PySide6.QtWidgets import QWidget, QFrame
 from .motion import tween, MotionIcon, enabled
@@ -7,6 +7,13 @@ from .motion import tween, MotionIcon, enabled
 
 class Atmosphere(QWidget):
     dark = False
+    accent = 0.0
+
+    def focus_scene(self, index):
+        def step(value):
+            self.accent = float(value)
+            self.update()
+        tween(self,'_atmosphere',self.accent,float(index),step,700,QEasingCurve.InOutCubic)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -27,10 +34,16 @@ class Atmosphere(QWidget):
         for position, color in stops:
             base.setColorAt(position, QColor(color))
         p.fillRect(self.rect(), base)
-        glow = QRadialGradient(self.width() * .3, self.height() * .88, self.width() * .65)
+        import math
+        glow = QRadialGradient(self.width() * (.3+.24*math.sin(self.accent)),
+                               self.height() * (.70+.18*math.cos(self.accent)), self.width() * .65)
         glow.setColorAt(0, QColor(145, 44, 215, 60 if self.dark else 95))
         glow.setColorAt(1, QColor(145, 44, 215, 0))
         p.fillRect(self.rect(), glow)
+        sky = QRadialGradient(self.width()*(.72+.12*math.sin(self.accent)),self.height()*.1,self.width()*.55)
+        sky.setColorAt(0,QColor(211,87,203,40 if self.dark else 65))
+        sky.setColorAt(1,QColor(211,87,203,0))
+        p.fillRect(self.rect(),sky)
 
 
 class GradientTile(QFrame):
@@ -47,8 +60,41 @@ class GradientTile(QFrame):
         super().__init__()
         self.tone = tone
         self.hover = 0.0
+        self.pointer = QPointF(.75, .18)
+        self.sweep = 1.0
         self.setObjectName("hero" if tone == "hero" else "featureTile")
         self.setAttribute(Qt.WA_StyledBackground, False)
+        self.setMouseTracking(True)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Child labels and buttons must participate in the same lighting field.
+        for child in self.findChildren(QWidget):
+            child.setMouseTracking(True)
+            child.installEventFilter(self)
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.MouseMove and enabled(self):
+            self.track_pointer(self.mapFromGlobal(event.globalPosition().toPoint()))
+        return super().eventFilter(watched, event)
+
+    def mouseMoveEvent(self, event):
+        if enabled(self):
+            self.track_pointer(event.position())
+        super().mouseMoveEvent(event)
+
+    def track_pointer(self, point):
+        destination = QPointF(point.x()/max(1,self.width()), point.y()/max(1,self.height()))
+        def step(value):
+            self.pointer = value
+            for artwork in self.findChildren(MotionIcon):
+                artwork.track(QPointF((value.x()-.5)*2, (value.y()-.5)*2))
+            self.update()
+        tween(self, '_pointer', self.pointer, destination, step, 180)
+
+    def set_sweep(self, value):
+        self.sweep = float(value)
+        self.update()
 
     def set_hover(self, value):
         self.hover = float(value)
@@ -56,13 +102,14 @@ class GradientTile(QFrame):
         self.hover_changed.emit(self.hover)
 
     def enterEvent(self, event):
-        tween(self, "_hover", self.hover, 1.0, self.set_hover, 350)
+        tween(self, "_hover", self.hover, 1.0, self.set_hover, 520, QEasingCurve.OutBack)
+        tween(self, '_sheen', 0.0, 1.0, self.set_sweep, 850, QEasingCurve.InOutCubic)
         for artwork in self.findChildren(MotionIcon):
             artwork.engage(1.0)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        tween(self, "_hover", self.hover, 0.0, self.set_hover, 450)
+        tween(self, "_hover", self.hover, 0.0, self.set_hover, 600, QEasingCurve.OutCubic)
         for artwork in self.findChildren(MotionIcon):
             artwork.engage(0.0)
         super().leaveEvent(event)
@@ -86,6 +133,18 @@ class GradientTile(QFrame):
         p.setOpacity((.28 if self.tone == "hero" else .48) + .15 * self.hover)
         p.fillPath(path, glow)
         p.setOpacity(1)
+        if enabled(self) and self.hover > .01:
+            light = QRadialGradient(rect.width()*self.pointer.x(), rect.height()*self.pointer.y(), rect.width()*.65)
+            light.setColorAt(0, QColor(255,226,255,int(48*min(1,self.hover))))
+            light.setColorAt(1, QColor(255,226,255,0))
+            p.fillPath(path, light)
+        if 0 < self.sweep < 1 and enabled(self):
+            x = rect.width()*(-.6+2.2*self.sweep)
+            gloss = QLinearGradient(x-rect.width()*.2,0,x+rect.width()*.2,rect.height())
+            gloss.setColorAt(0,QColor(255,255,255,0))
+            gloss.setColorAt(.5,QColor(255,235,255,35))
+            gloss.setColorAt(1,QColor(255,255,255,0))
+            p.fillPath(path, gloss)
         sheen = QLinearGradient(0, 0, 0, rect.height())
         sheen.setColorAt(0, QColor(255, 255, 255, int(38 + 70 * self.hover)))
         sheen.setColorAt(.5, QColor(255, 255, 255, 4))

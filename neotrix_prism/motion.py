@@ -1,6 +1,6 @@
 """Interaction-driven Qt motion. Timelines stop when settled or motion is reduced."""
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QSize, QTimer
-from PySide6.QtGui import QPainter, QColor, QPen, QLinearGradient, QRadialGradient
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QSize, QTimer, QPointF
+from PySide6.QtGui import QPainter, QColor, QPen, QLinearGradient, QRadialGradient, QPainterPath
 from PySide6.QtWidgets import QPushButton, QWidget, QStylePainter, QStyleOptionButton, QStyle, QGraphicsEffect
 
 
@@ -33,6 +33,8 @@ class MotionButton(QPushButton):
     def __init__(self, text="", parent=None):
         super().__init__(text, parent)
         self.hover = self.press = 0.0
+        self.ripple = 1.0
+        self.ripple_origin = QPointF()
         self.setCursor(Qt.PointingHandCursor)
         self.pressed.connect(lambda: self.animate_press(1.0))
         self.released.connect(lambda: self.animate_press(0.0))
@@ -48,6 +50,14 @@ class MotionButton(QPushButton):
     def set_hover(self, value):
         self.hover = float(value)
         self.update()
+
+    def mousePressEvent(self, event):
+        self.ripple_origin = event.position()
+        def advance(value):
+            self.ripple = float(value)
+            self.update()
+        tween(self, '_ripple', 0.0, 1.0, advance, 580)
+        super().mousePressEvent(event)
 
     def enterEvent(self, event):
         tween(self, "_hover", self.hover, 1.0, self.set_hover, 220)
@@ -74,12 +84,21 @@ class MotionButton(QPushButton):
             p.setBrush(QColor(255, 230, 255, int(14 * self.hover)))
             p.setPen(QPen(QColor(244, 185, 255, int(110 * self.hover)), 1.2))
             p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 11, 11)
+        if enabled(self) and 0 < self.ripple < 1:
+            clip = QPainterPath()
+            clip.addRoundedRect(QRectF(self.rect()).adjusted(1,1,-1,-1),11,11)
+            p.setClipPath(clip)
+            radius = max(self.width(),self.height())*self.ripple
+            p.setPen(QPen(QColor(255,230,255,int(130*(1-self.ripple))),1.5))
+            p.setBrush(QColor(255,230,255,int(25*(1-self.ripple))))
+            p.drawEllipse(self.ripple_origin,radius,radius)
 
 
 class MotionIcon(QWidget):
     def __init__(self, name, size=100):
         super().__init__()
         self.name, self.hover, self.reveal = name, 0.0, 1.0
+        self.pointer = QPointF()
         self.setFixedSize(size, size)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
 
@@ -89,6 +108,11 @@ class MotionIcon(QWidget):
 
     def engage(self, target):
         tween(self, "_hover", self.hover, target, self.set_hover, 480, QEasingCurve.OutBack)
+
+    def track(self, point):
+        if enabled(self):
+            self.pointer = point
+            self.update()
 
     def appear(self, delay=0):
         if not enabled(self):
@@ -109,9 +133,18 @@ class MotionIcon(QWidget):
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         w, h = self.width(), self.height()
         p.setOpacity(min(1, self.reveal))
-        p.translate(w / 2, h / 2 + (1 - self.reveal) * 25 - self.hover * 5)
-        p.rotate(-4 * self.hover + (1 - self.reveal) * 8)
-        p.scale(.8 + .2 * self.reveal + .06 * self.hover, .8 + .2 * self.reveal + .06 * self.hover)
+        # Artwork floats independently of the surface: depth comes from the
+        # pointer offset, changing shadow and delayed spring settlement.
+        p.translate(w / 2 + self.pointer.x() * 10 * self.hover,
+                    h / 2 + (1 - self.reveal) * 58 - self.hover * 13 + self.pointer.y() * 8 * self.hover)
+        shadow = QRadialGradient(0, h * .32, w * .48)
+        shadow.setColorAt(0, QColor(10, 5, 36, int(95 * self.hover)))
+        shadow.setColorAt(1, QColor(10, 5, 36, 0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(shadow)
+        p.drawEllipse(QRectF(-w*.48, h*.15, w*.96, h*.3))
+        p.rotate(-11 * self.hover + self.pointer.x() * 7 * self.hover + (1 - self.reveal) * 24)
+        p.scale(.55 + .45 * self.reveal + .16 * self.hover, .55 + .45 * self.reveal + .12 * self.hover)
         p.drawPixmap(-w // 2, -h // 2, icon(self.name, w).pixmap(w, h))
 
 
@@ -126,8 +159,11 @@ class PageEffect(QGraphicsEffect):
 
     def draw(self, painter):
         painter.save()
-        painter.setOpacity(.15 + .85 * self.amount)
-        painter.translate(0, 22 * (1 - self.amount))
+        painter.setOpacity(max(0, min(1, self.amount)))
+        rect = self.sourceBoundingRect()
+        painter.translate(rect.width()/2, rect.height()/2 + 54 * (1 - self.amount))
+        painter.scale(.9 + .1*self.amount, .9 + .1*self.amount)
+        painter.translate(-rect.width()/2, -rect.height()/2)
         self.drawSource(painter)
         painter.restore()
 
@@ -151,6 +187,72 @@ def reveal_page(widget):
         animation.finished.connect(lambda: widget.setGraphicsEffect(None) if widget.graphicsEffect() is effect else None)
 
 
+class SceneTransition(QWidget):
+    """A short-lived snapshot layer; real controls remain live underneath.
+
+    Tile navigation grows from its actual source rectangle. Sidebar navigation
+    uses directional depth. Interrupted transitions release both pixmaps.
+    """
+    def __init__(self, stack, outgoing, origin=None, direction=1):
+        super().__init__(stack)
+        self.outgoing, self.incoming = outgoing, stack.currentWidget().grab()
+        self.amount = 0.0
+        self.origin = QRectF(origin) if origin else None
+        self.direction = direction
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setGeometry(stack.rect())
+        self.show()
+        self.raise_()
+        animation = tween(self, '_scene', 0.0, 1.0, self.advance, 420, QEasingCurve.InOutCubic)
+        if animation:
+            animation.finished.connect(self.finish)
+        else:
+            self.finish()
+
+    def advance(self, value):
+        self.amount = float(value)
+        self.update()
+
+    def finish(self):
+        if getattr(self, '_scene', None):
+            self._scene.stop()
+        self.hide()
+        self.outgoing = self.incoming = None
+        self.deleteLater()
+
+    def paintEvent(self, event):
+        if self.incoming is None:
+            return
+        p = QPainter(self)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        full, t = QRectF(self.rect()), self.amount
+        # Opaque underlay prevents the final live page peeking through early.
+        p.fillRect(full, QColor('#35205d'))
+        if self.outgoing and not self.outgoing.isNull():
+            p.save()
+            p.setOpacity(1 if self.origin else max(0,1-t*2))
+            old = full if self.origin else full.adjusted(t*36, t*20, -t*36, -t*20)
+            if not self.origin:
+                old.translate(-self.direction*t*90, 0)
+            p.drawPixmap(old, self.outgoing, QRectF(self.outgoing.rect()))
+            p.restore()
+        if self.origin:
+            start = self.origin
+            target = QRectF(start.x()*(1-t), start.y()*(1-t),
+                            start.width()+(full.width()-start.width())*t,
+                            start.height()+(full.height()-start.height())*t)
+        else:
+            target = full.adjusted((1-t)*28, (1-t)*18, -(1-t)*28, -(1-t)*18)
+            target.translate(self.direction*(1-t)*110, 0)
+        path = QPainterPath()
+        path.addRoundedRect(target, 26*(1-t), 26*(1-t))
+        p.setClipPath(path)
+        p.setOpacity(1 if self.origin else min(1, t*2))
+        # Reveal live-size content through the growing container, rather than
+        # stretching small text and cross-fading two dense interfaces.
+        p.drawPixmap(full if self.origin else target, self.incoming, QRectF(self.incoming.rect()))
+
+
 class OrbButton(MotionButton):
     """A bright circular action with an honest task-driven progress ring."""
     def __init__(self, text="Explore", parent=None):
@@ -158,6 +260,7 @@ class OrbButton(MotionButton):
         self.setFixedSize(84, 84)
         self.setAccessibleName("Explore projects")
         self.busy, self.angle = False, 0.0
+        self.activity = 0.0
         self.spin = QVariantAnimation(self)
         self.spin.setStartValue(0.0)
         self.spin.setEndValue(360.0)
@@ -170,7 +273,13 @@ class OrbButton(MotionButton):
         self.update()
 
     def set_busy(self, busy):
+        changed = self.busy != busy
         self.busy = busy
+        if changed:
+            def advance(value):
+                self.activity = float(value)
+                self.update()
+            tween(self, '_activity', self.activity, 1.0 if busy else 0.0, advance, 520, QEasingCurve.OutBack)
         self.setText("Stop" if busy else "Explore")
         self.setAccessibleName("Cancel current operation" if busy else "Explore projects")
         if busy and enabled(self) and self.isVisible() and not self.window().isMinimized():
@@ -192,7 +301,7 @@ class OrbButton(MotionButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.translate(42, 42)
-        scale = 1 + .055 * self.hover - .06 * self.press
+        scale = 1 + .10 * self.hover - .09 * self.press + .035*self.activity
         p.scale(scale, scale)
         glow = QRadialGradient(0, 0, 41)
         glow.setColorAt(0, QColor(237, 56, 233, 95))
@@ -207,9 +316,20 @@ class OrbButton(MotionButton):
         p.setBrush(body)
         p.setPen(QPen(QColor("#f3c4fb"), 1.2))
         p.drawEllipse(QRectF(-34, -34, 68, 68))
+        highlight = QRadialGradient(-14-self.hover*8,-22,40)
+        highlight.setColorAt(0,QColor(255,255,255,int(80+40*self.hover)))
+        highlight.setColorAt(.5,QColor(255,220,255,15))
+        highlight.setColorAt(1,QColor(255,255,255,0))
+        p.setPen(Qt.NoPen)
+        p.setBrush(highlight)
+        p.drawEllipse(QRectF(-33,-33,66,66))
         if self.busy:
+            import math
             p.setPen(QPen(QColor("#fff4ff"), 3, Qt.SolidLine, Qt.RoundCap))
-            p.drawArc(QRectF(-36, -36, 72, 72), int(self.angle * 16), 100 * 16)
+            span = 100 + 65*math.sin(math.radians(self.angle)) if enabled(self) else 100
+            p.drawArc(QRectF(-36, -36, 72, 72), int(self.angle * 16), int(span * 16))
+            p.setPen(QPen(QColor(251,177,255,100),1.5,Qt.SolidLine,Qt.RoundCap))
+            p.drawArc(QRectF(-39,-39,78,78),int(-self.angle*16),55*16)
         if self.hasFocus():
             p.setPen(QPen(QColor("#ffffff"), 2, Qt.DotLine))
             p.drawEllipse(QRectF(-39, -39, 78, 78))

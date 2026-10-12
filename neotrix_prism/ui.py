@@ -4,7 +4,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QPropertyAnimation, QEasingCurve
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect, QPoint
 from PySide6.QtGui import QPixmap, QAction, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPushButton, QLabel, QStackedWidget, QLineEdit, QComboBox, QTableWidget, QTableWidgetItem,
@@ -14,7 +14,7 @@ from . import __version__, apps, indexer, graph
 from .storage import Settings, GraphLibrary, user_dir, atomic_json, read_json, history, activity
 from .design import icon, stylesheet, fade, palette, native_theme
 from .surfaces import Atmosphere, GradientTile, WorkspaceArt
-from .motion import MotionButton, MotionIcon, OrbButton, reveal_page, tween, enabled
+from .motion import MotionButton, MotionIcon, OrbButton, SceneTransition, reveal_page, tween, enabled
 from .window_chrome import RoundedShell, Caption, ResizeFrame
 from .graph_ui import GraphEditor
 
@@ -214,6 +214,10 @@ class MainWindow(QMainWindow):
 
     def apply_theme(self):
         if self.settings.data["reduced_motion"]:
+            transition = getattr(self, '_scene_transition', None)
+            if transition:
+                transition.finish()
+                self._scene_transition = None
             from PySide6.QtCore import QVariantAnimation
             for animation in self.findChildren(QVariantAnimation):
                 animation.stop()
@@ -282,7 +286,14 @@ class MainWindow(QMainWindow):
             self.selection_rail.setGeometry(self.nav[current].geometry())
         tween(self, "_sidebar_motion", self.sidebar.width(), 78 if self.compact_sidebar else 202, step, 380)
 
-    def navigate(self, name):
+    def navigate(self, name, origin=None):
+        previous = self.stack.currentWidget()
+        old_transition = getattr(self, '_scene_transition', None)
+        if old_transition:
+            old_transition.finish()
+            self._scene_transition = None
+        outgoing = previous.grab() if previous and previous is not self.pages[name] and enabled(self) and self.isVisible() else None
+        direction = 1 if previous is None or self.stack.indexOf(previous) <= self.stack.indexOf(self.pages[name]) else -1
         titles = {"Home": ("Your creative workspace", "Everything you need to pick up where you left off."),
                   "Projects": ("Projects", "Find the right project. Open the right version."),
                   "Favorites": ("Your favorites", "The projects and files you keep close."),
@@ -296,6 +307,7 @@ class MainWindow(QMainWindow):
         for key, nav in self.nav.items():
             nav.setChecked(key == name)
         self.stack.setCurrentWidget(self.pages[name])
+        self.surface.focus_scene(self.stack.currentIndex())
         self.orb.setVisible(name == "Home" or bool(self.jobs))
         QTimer.singleShot(0, self, lambda: self.move_selection(name))
         if name == "Activity":
@@ -305,10 +317,22 @@ class MainWindow(QMainWindow):
         elif name == "Workflows":
             self.editor.refresh_library()
             QTimer.singleShot(0, self.editor.fit)
-        reveal_page(self.pages[name])
+        self.pages[name].setGraphicsEffect(None)
+        if outgoing is not None:
+            self._scene_transition = SceneTransition(self.stack, outgoing, origin, direction)
+            transition = self._scene_transition
+            transition.destroyed.connect(lambda: setattr(self, '_scene_transition', None) if getattr(self, '_scene_transition', None) is transition else None)
+        elif name != 'Home':
+            reveal_page(self.pages[name])
         if name == "Home":
-            for i, artwork in enumerate(self.pages[name].findChildren(MotionIcon)):
-                artwork.appear(i * 75)
+            def introduce():
+                if self.stack.currentWidget() is not self.pages['Home']:
+                    return
+                for i, tile in enumerate(self.pages['Home'].findChildren(GradientTile)):
+                    QTimer.singleShot(i*65, tile, lambda t=tile: reveal_page(t) if t.isVisible() else None)
+                for i, artwork in enumerate(self.pages[name].findChildren(MotionIcon)):
+                    artwork.appear(i * 90)
+            QTimer.singleShot(430 if outgoing is not None else 0, self, introduce)
 
     def build_home(self):
         outer = self.page("Home")
@@ -339,9 +363,9 @@ class MainWindow(QMainWindow):
             inner.addWidget(label(title, "section", True))
             inner.addWidget(label(description, "subtitle", True))
             inner.addStretch()
-            inner.addWidget(button("Open " + name.lower(), lambda checked=False, n=name: self.navigate(n)))
+            inner.addWidget(button("Open " + name.lower(), lambda checked=False, n=name, f=frame: self.navigate(n, QRect(f.mapTo(self.stack, QPoint(0,0)), f.size()))))
             overview.addWidget(frame, 100)
-            frame.hover_changed.connect(lambda value, i=tile_index: overview.setStretch(i, int(100 + 12 * value)))
+            frame.hover_changed.connect(lambda value, i=tile_index: overview.setStretch(i, int(100 + (65 if self.width()>1150 else 18) * max(0,value))))
         layout.addLayout(overview, 3)
         row = QHBoxLayout()
         recent_tile = GradientTile("Recent")
