@@ -9,7 +9,7 @@ from PySide6.QtGui import QPixmap, QAction, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPushButton, QLabel, QStackedWidget, QLineEdit, QComboBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QSplitter, QScrollArea, QProgressBar, QMessageBox, QFileDialog,
-    QPlainTextEdit, QCheckBox, QFormLayout, QDialog, QDialogButtonBox, QMenu, QLayout, QSizePolicy)
+    QPlainTextEdit, QCheckBox, QFormLayout, QDialog, QDialogButtonBox, QMenu, QLayout, QSizePolicy, QAbstractScrollArea)
 from . import __version__, apps, indexer, graph
 from .storage import Settings, GraphLibrary, user_dir, atomic_json, read_json, history, activity
 from .design import icon, stylesheet, fade, palette, native_theme
@@ -17,6 +17,7 @@ from .surfaces import Atmosphere, GradientTile, WorkspaceArt
 from .motion import MotionButton, MotionIcon, OrbButton, SceneTransition, reveal_page, tween, enabled
 from .window_chrome import RoundedShell, Caption, ResizeFrame
 from .graph_ui import GraphEditor
+from .cards import CardSurface, round_surface
 
 
 class Worker(QThread):
@@ -249,7 +250,19 @@ class MainWindow(QMainWindow):
             scroll.viewport().setAutoFillBackground(False)
             if scroll.widget():
                 scroll.widget().setAutoFillBackground(False)
+        for scroll in self.findChildren(QAbstractScrollArea):
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            round_surface(scroll)
+            round_surface(scroll.viewport())
+        for menu in self.findChildren(QMenu):
+            round_surface(menu)
         self.editor.dark = dark
+        for surface in self.findChildren(CardSurface):
+            if self.settings.data['reduced_motion']:
+                surface.hover=0
+                surface.advance(surface.target)
+            surface.update()
         self.editor.view.viewport().update()
         for item in self.editor.items.values():
             if self.settings.data["reduced_motion"]:
@@ -433,33 +446,36 @@ class MainWindow(QMainWindow):
         project_controls = QHBoxLayout()
         self.project_search = QLineEdit()
         self.project_search.setPlaceholderText("Search projects")
-        self.project_search.textChanged.connect(self.render_projects)
+        self.project_search.textChanged.connect(self.search_projects)
         project_controls.addWidget(self.project_search, 1)
         self.project_picker = QComboBox()
         self.project_picker.setMinimumWidth(160)
         self.project_picker.activated.connect(lambda i: self.open_project(self.project_picker.itemData(i)))
         project_controls.addWidget(self.project_picker)
-        self.project_mode = QComboBox()
-        self.project_mode.addItems(["Cards", "List"])
-        self.project_mode.currentIndexChanged.connect(self.render_projects)
-        project_controls.addWidget(self.project_mode)
-        project_controls.addWidget(button("Browse projects", lambda: self.project_views.setVisible(not self.project_views.isVisible())))
+        project_controls.addWidget(button("Browse projects", self.browse_projects))
         project_controls.addWidget(button("Refresh", self.refresh))
         layout.addLayout(project_controls)
-        self.project_views = QStackedWidget()
-        self.project_cards = QScrollArea()
-        self.project_cards.setWidgetResizable(True)
-        self.project_grid_widget = QWidget()
-        self.project_grid = QGridLayout(self.project_grid_widget)
-        self.project_grid.setContentsMargins(0, 0, 0, 0)
-        self.project_cards.setWidget(self.project_grid_widget)
-        self.project_views.addWidget(self.project_cards)
-        self.project_table = table(["Project", "Storage", "Favorite"])
-        self.project_table.cellDoubleClicked.connect(lambda row, col: self.open_project(self.filtered_projects[row]))
-        self.project_views.addWidget(self.project_table)
-        self.project_views.setMaximumHeight(210)
-        self.project_views.setMinimumHeight(135)
-        layout.addWidget(self.project_views)
+        self.project_views = QWidget()
+        shelf_layout = QVBoxLayout(self.project_views)
+        shelf_layout.setContentsMargins(0,0,0,0)
+        self.project_cards = CardSurface(shelf=True)
+        self.project_cards.activated.connect(lambda index: self.open_project(self.filtered_projects[index]))
+        shelf_layout.addWidget(self.project_cards,1)
+        shelf_controls = QHBoxLayout()
+        shelf_controls.addWidget(button('‹',lambda: self.project_cards.selectRow(max(0,round(self.project_cards.target)-1))))
+        shelf_controls.addStretch()
+        shelf_controls.addWidget(label('Scroll or drag · Arrow keys to browse · Enter to open', 'subtitle'))
+        shelf_controls.addStretch()
+        shelf_controls.addWidget(button('›',lambda: self.project_cards.selectRow(min(len(self.filtered_projects)-1,round(self.project_cards.target)+1))))
+        shelf_layout.addLayout(shelf_controls)
+        self.project_views.setMinimumHeight(245)
+        layout.addWidget(self.project_views,1)
+        self.work_panel = QWidget()
+        layout.addWidget(self.work_panel,1)
+        layout = QVBoxLayout(self.work_panel)
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(16)
+        self.work_panel.hide()
         self.breadcrumb = label("Select a project to explore its working files.", "subtitle")
         self.breadcrumb.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.breadcrumb)
@@ -490,43 +506,70 @@ class MainWindow(QMainWindow):
             self.filters[key] = combo
         layout.addLayout(row)
         split = QSplitter()
-        self.file_table = table(["Working file", "Application", "Version", "Modified"])
-        self.file_table.itemSelectionChanged.connect(self.update_details)
-        self.file_table.cellDoubleClicked.connect(lambda row, col: self.open_selected())
-        split.addWidget(self.file_table)
+        self.file_cards = CardSurface()
+        self.file_cards.selection_changed.connect(self.update_details)
+        self.file_cards.activated.connect(lambda index: self.open_selected())
+        split.addWidget(self.file_cards)
         detail, inner = card()
+        inner.setContentsMargins(12,12,12,12)
+        inner.setSpacing(6)
         self.details_panel = detail
         detail.setMinimumWidth(220)
         detail.setMaximumWidth(280)
         self.preview_image = QLabel()
         self.preview_image.setAlignment(Qt.AlignCenter)
-        self.preview_image.setMinimumHeight(100)
-        self.preview_image.setFixedHeight(115)
+        self.preview_image.setFixedHeight(78)
         inner.addWidget(self.preview_image)
         self.detail_name = label("Select a working file", "section", True)
         inner.addWidget(self.detail_name)
         self.detail_info = label("Its details and actions will appear here.", "subtitle", True)
         self.detail_info.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        inner.addWidget(self.detail_info)
-        inner.addStretch()
+        metadata = QWidget()
+        metadata_layout=QVBoxLayout(metadata)
+        metadata_layout.setContentsMargins(6,6,6,6)
+        metadata_layout.addWidget(self.detail_info)
+        metadata_scroll=QScrollArea()
+        metadata_scroll.setWidgetResizable(True)
+        metadata_scroll.setMinimumHeight(24)
+        metadata_scroll.setWidget(metadata)
+        inner.addWidget(metadata_scroll,1)
         self.file_actions = []
-        for text, callback, primary in (("Open file", self.open_selected, True), ("Open with…", self.open_with, False),
+        action_row=QHBoxLayout()
+        action_row.setSpacing(6)
+        inner.addLayout(action_row)
+        more_menu = QMenu(detail)
+        round_surface(more_menu)
+        for index,(text, callback, primary) in enumerate((("Open file", self.open_selected, True), ("Open with…", self.open_with, False),
                                          ("Save new version", self.save_selected_version, False),
                                          ("Reveal in Explorer", self.reveal_selected, False), ("Copy path", self.copy_selected, False),
-                                         ("Favorite file", self.favorite_selected, False)):
-            item = button(text, callback, primary)
-            inner.addWidget(item)
+                                         ("Favorite file", self.favorite_selected, False))):
+            if index in (0,2):
+                item = button('Open file' if index==0 else 'Save\nversion',callback,primary)
+                item.setMinimumHeight(44)
+                item.setAccessibleName(text)
+                item.setToolTip(text)
+                action_row.addWidget(item,1)
+            else:
+                item = more_menu.addAction(text)
+                item.triggered.connect(callback)
             self.file_actions.append(item)
-        detail.setMinimumHeight(620)
-        detail_scroll = QScrollArea()
-        detail_scroll.setWidgetResizable(True)
-        detail_scroll.setWidget(detail)
-        detail_scroll.setMinimumWidth(230)
-        detail_scroll.setMaximumWidth(285)
-        split.addWidget(detail_scroll)
+        self.more_actions = MotionButton('More actions  ···')
+        self.more_actions.setMenu(more_menu)
+        inner.addWidget(self.more_actions)
+        detail.setMinimumHeight(210)
+        split.addWidget(detail)
         split.setStretchFactor(0, 1)
         layout.addWidget(split, 1)
         self.update_details()
+
+    def browse_projects(self):
+        self.project_views.show()
+        self.work_panel.hide()
+        self.project_cards.setFocus()
+
+    def search_projects(self):
+        self.render_projects()
+        self.browse_projects()
 
     def worker(self, fn, done, failure=None):
         job = Worker(fn)
@@ -599,29 +642,18 @@ class MainWindow(QMainWindow):
 
     def render_projects(self):
         self.filtered_projects = [p for p in self.projects if self.project_search.text().lower() in Path(p).name.lower()]
-        self.project_views.setCurrentIndex(self.project_mode.currentIndex())
-        self.clear_layout(self.project_grid)
-        self.project_table.setRowCount(len(self.filtered_projects))
-        for i, path in enumerate(self.filtered_projects):
-            item = button(Path(path).name + "\nExplore project  →", lambda checked=False, p=path: self.open_project(p))
-            item.setObjectName("projectCard")
-            item.setMinimumHeight(110)
-            item.setIcon(icon("Projects", 40))
-            item.setIconSize(QSize(40, 40))
-            item.setToolTip(path)
-            self.project_grid.addWidget(item, i // 3, i % 3)
-            for j, text in enumerate((Path(path).name, str(Path(path).parent),
-                                      "★" if path in self.settings.data["favorites"] else "")):
-                self.project_table.setItem(i, j, QTableWidgetItem(text))
-        if not self.filtered_projects:
-            self.project_grid.addWidget(label("No projects found. Check storage roots in Settings.", "subtitle"), 0, 0)
-        self.project_grid.setRowStretch(len(self.filtered_projects) // 3 + 1, 1)
+        self.project_cards.set_entries([{'name':Path(path).name,'path':path,
+            'subtitle':'★ Favorite · Explore project →' if path in self.settings.data['favorites'] else 'Explore project →'} for path in self.filtered_projects])
 
     def open_project(self, path):
         if not path:
             return
+        if path != self.project:
+            self.file_cards.offset = self.file_cards.target = 0.0
+            self.file_cards.selected_index = -1
         self.project = path
         self.project_views.hide()
+        self.work_panel.show()
         picker_index = self.project_picker.findData(path)
         if picker_index >= 0:
             self.project_picker.setCurrentIndex(picker_index)
@@ -670,36 +702,31 @@ class MainWindow(QMainWindow):
             combo.blockSignals(False)
 
     def filter_files(self):
+        self.file_cards.empty_message = 'No files match these filters. Try another application or clear your search.' if self.project else 'Choose a project above to discover its creative files.'
         search = self.file_search.text().lower()
         self.display_files = [f for f in self.files if f.get("kind", "working") == self.file_kind.currentData()
                               and search in f["relative"].lower()
                               and all(not combo.currentData() or f[key] == combo.currentData() for key, combo in self.filters.items())]
-        self.file_table.setRowCount(len(self.display_files))
-        for i, file in enumerate(self.display_files):
-            texts = [file["name"], file["application"], file["version"],
-                     time.strftime("%d %b %Y · %H:%M", time.localtime(file["modified"]))]
-            for j, text in enumerate(texts):
-                item = QTableWidgetItem(text)
-                item.setToolTip(file["path"])
-                if j == 0:
-                    item.setIcon(icon(file["application"], 28))
-                self.file_table.setItem(i, j, item)
+        self.file_cards.set_entries([{**file,'subtitle':file['version']+' · '+file['department']+'\n'+
+            time.strftime('%d %b %Y · %H:%M',time.localtime(file['modified']))} for file in self.display_files])
         self.update_details()
 
     def selected(self):
-        row = self.file_table.currentRow()
+        row = self.file_cards.currentRow()
         return self.display_files[row] if 0 <= row < len(self.display_files) else None
 
     def update_details(self):
         if hasattr(self, "details_panel"):
             reveal_page(self.details_panel)
         file = self.selected()
+        self.more_actions.setEnabled(bool(file))
         for item in self.file_actions:
             item.setEnabled(bool(file))
         if not file:
             self.detail_name.setText("Select a working file")
             self.detail_info.setText("Its details and actions will appear here.")
-            self.preview_image.setPixmap(icon("Projects", 82).pixmap(82, 82))
+            self.preview_source=icon('Projects',256).pixmap(256,256)
+            self.fit_preview()
             return
         self.detail_name.setText(file["name"])
         from PySide6.QtGui import QFontMetrics
@@ -710,11 +737,27 @@ class MainWindow(QMainWindow):
         self.detail_info.setText(file["application"] + " · " + file["version"] + "\n" + file["department"] + " · " + file["stage"]
                                  + "\n" + f"{file['size'] / (1024 * 1024):.1f} MB" + "\n\n" + relative)
         self.detail_info.setToolTip(file["path"])
-        pixmap = QPixmap(file["preview"]) if file.get("preview") else QPixmap()
-        self.preview_image.setPixmap(pixmap.scaled(218, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation) if not pixmap.isNull()
-                                     else icon(file["application"], 90).pixmap(90, 90))
+        pixmap=QPixmap()
+        if file.get('preview'):
+            from PySide6.QtGui import QImageReader
+            reader=QImageReader(file['preview']);reader.setAutoTransform(True)
+            size=reader.size()
+            if size.isValid():
+                reader.setScaledSize(size.scaled(512,512,Qt.KeepAspectRatio))
+                pixmap=QPixmap.fromImage(reader.read())
+        self.preview_source=pixmap if not pixmap.isNull() else icon(file['application'],256).pixmap(256,256)
+        self.fit_preview()
         self.file_actions[-1].setText("Unfavorite file" if file["path"] in self.settings.data["favorites"] else "Favorite file")
         self.file_actions[2].setEnabled(file["application"] in ("Blender", "Photoshop", "After Effects"))
+
+    def fit_preview(self):
+        source=getattr(self,'preview_source',None)
+        if source is None or source.isNull():
+            return
+        dpr=self.preview_image.devicePixelRatioF()
+        fitted=source.scaled(int(160*dpr),int(max(8,min(72,self.preview_image.height()-6))*dpr),Qt.KeepAspectRatio,Qt.SmoothTransformation)
+        fitted.setDevicePixelRatio(dpr)
+        self.preview_image.setPixmap(fitted)
 
     def open_path(self, path, application=None, executable=None):
         application = application or indexer.EXTENSIONS.get(Path(path).suffix.lower(), "")
@@ -1096,6 +1139,9 @@ class MainWindow(QMainWindow):
             def align():
                 current = next((n for n, b in self.nav.items() if b.isChecked()), "Home")
                 self.selection_rail.setGeometry(self.nav[current].geometry())
+                if hasattr(self,'preview_image'):
+                    self.preview_image.setFixedHeight(44 if self.height()<=760 else 78)
+                    self.fit_preview()
                 for frame in self.pages["Home"].findChildren(GradientTile):
                     if frame.tone in ("Projects", "Workflows", "Favorites"):
                         for artwork in frame.findChildren(MotionIcon):

@@ -135,17 +135,27 @@ class MotionIcon(QWidget):
         p.setOpacity(min(1, self.reveal))
         # Artwork floats independently of the surface: depth comes from the
         # pointer offset, changing shadow and delayed spring settlement.
-        p.translate(w / 2 + self.pointer.x() * 10 * self.hover,
-                    h / 2 + (1 - self.reveal) * 58 - self.hover * 13 + self.pointer.y() * 8 * self.hover)
+        import math
+        art = int(min(w,h)*.76)
+        angle = -11*self.hover + self.pointer.x()*7*self.hover + (1-self.reveal)*24
+        footprint = abs(math.cos(math.radians(angle)))+abs(math.sin(math.radians(angle)))
+        sx = min(.55+.45*self.reveal+.16*self.hover,(w-4)/(art*footprint))
+        sy = min(.55+.45*self.reveal+.12*self.hover,(h-4)/(art*footprint))
+        extent = art*max(sx,sy)*footprint/2+1
+        x = max(extent,min(w-extent,w/2+self.pointer.x()*10*self.hover))
+        y = max(extent,min(h-extent,h/2+(1-self.reveal)*58-self.hover*13+self.pointer.y()*8*self.hover))
+        p.translate(x,y)
         shadow = QRadialGradient(0, h * .32, w * .48)
         shadow.setColorAt(0, QColor(10, 5, 36, int(95 * self.hover)))
         shadow.setColorAt(1, QColor(10, 5, 36, 0))
         p.setPen(Qt.NoPen)
         p.setBrush(shadow)
         p.drawEllipse(QRectF(-w*.48, h*.15, w*.96, h*.3))
-        p.rotate(-11 * self.hover + self.pointer.x() * 7 * self.hover + (1 - self.reveal) * 24)
-        p.scale(.55 + .45 * self.reveal + .16 * self.hover, .55 + .45 * self.reveal + .12 * self.hover)
-        p.drawPixmap(-w // 2, -h // 2, icon(self.name, w).pixmap(w, h))
+        p.rotate(angle)
+        p.scale(sx,sy)
+        # Keep a safe apron for spring rotation, lift and pointer parallax.
+        # Painting the artwork edge-to-edge clipped it inside its QWidget.
+        p.drawPixmap(-art // 2, -art // 2, icon(self.name, art).pixmap(art, art))
 
 
 class PageEffect(QGraphicsEffect):
@@ -226,6 +236,9 @@ class SceneTransition(QWidget):
         p = QPainter(self)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         full, t = QRectF(self.rect()), self.amount
+        boundary=QPainterPath()
+        boundary.addRoundedRect(full,22,22)
+        p.setClipPath(boundary)
         # Opaque underlay prevents the final live page peeking through early.
         p.fillRect(full, QColor('#35205d'))
         if self.outgoing and not self.outgoing.isNull():
@@ -246,7 +259,7 @@ class SceneTransition(QWidget):
             target.translate(self.direction*(1-t)*110, 0)
         path = QPainterPath()
         path.addRoundedRect(target, 26*(1-t), 26*(1-t))
-        p.setClipPath(path)
+        p.setClipPath(path,Qt.IntersectClip)
         p.setOpacity(1 if self.origin else min(1, t*2))
         # Reveal live-size content through the growing container, rather than
         # stretching small text and cross-fading two dense interfaces.

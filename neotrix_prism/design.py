@@ -1,5 +1,6 @@
 """Shared Neotrix design tokens, original SVG icons and lightweight animation."""
 from functools import lru_cache
+from pathlib import Path
 from PySide6.QtCore import QByteArray, Qt, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QPalette, QColor
 from PySide6.QtSvg import QSvgRenderer
@@ -26,6 +27,12 @@ PATHS = {
 
 @lru_cache(maxsize=128)
 def icon(name, size=48):
+    application_art = {'Blender':'blender','Photoshop':'photoshop','Illustrator':'illustrator',
+                       'After Effects':'after-effects','Fusion':'fusion'}
+    if name in application_art:
+        asset=Path(__file__).resolve().parents[1]/'assets'/'app-icons'/(application_art[name]+'.png')
+        if asset.is_file():
+            return QIcon(str(asset))
     color = COLORS.get(name, "#8875f0")
     drawing = PATHS.get(name, PATHS["Projects"])
     light, deep = QColor(color).lighter(145).name(), QColor(color).darker(170).name()
@@ -82,6 +89,7 @@ def stylesheet(dark=False):
     QPushButton {background:CARD; border:1px solid EDGE; border-radius:10px; padding:9px 15px; font-weight:550;}
     QPushButton:hover {background:SELECTED; border-color:#c2b6ec;}
     QPushButton:pressed {background:#79489e; color:white;}
+    QPushButton::menu-indicator {subcontrol-origin:padding; subcontrol-position:center right; right:5px; width:8px; height:8px;}
     QPushButton:focus, QLineEdit:focus, QComboBox:focus {border:2px solid #8a75ea;}
     QPushButton#primary {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #ae57ce,stop:.48 #8651c2,stop:1 #6040a4); color:white; border:1px solid #b07ad4;}
     QPushButton#primary:hover {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #c16ade,stop:1 #7550ba);}
@@ -95,7 +103,7 @@ def stylesheet(dark=False):
     QPushButton:disabled {color:MUTED; background:BG;}
     QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {background:CARD; border:1px solid EDGE; border-radius:9px; padding:8px; selection-background-color:#8875ed;}
     QComboBox::drop-down {border:none; width:22px;}
-    QComboBox QAbstractItemView {background:CARD; selection-background-color:SELECTED; color:TEXT;}
+    QComboBox QAbstractItemView {background:CARD; border:1px solid EDGE; border-radius:12px; selection-background-color:SELECTED; color:TEXT;}
     QTableWidget, QListWidget, QTreeWidget {background:CARD; border:1px solid EDGE; border-radius:12px; gridline-color:EDGE; alternate-background-color:BG; selection-background-color:SELECTED; selection-color:TEXT;}
     QTableWidget::item {padding:8px; border-bottom:1px solid EDGE;}
     QHeaderView::section {background:BG; color:MUTED; border:none; padding:10px; font-weight:600;}
@@ -106,12 +114,12 @@ def stylesheet(dark=False):
     QGroupBox {border:1px solid EDGE; border-radius:12px; margin-top:14px; padding:12px;}
     QGroupBox::title {subcontrol-origin:margin; left:12px; padding:0 6px;}
     QToolButton {background:CARD; border:1px solid EDGE; border-radius:8px; padding:5px;}
-    QMenu {background:CARD; border:1px solid EDGE; padding:6px;}
+    QMenu {background:CARD; border:1px solid EDGE; border-radius:12px; padding:6px;}
     QMenu::item {padding:8px 20px; border-radius:6px;}
     QMenu::item:selected {background:SELECTED;}
-    QScrollBar:vertical {background:transparent; width:8px; margin:0;}
+    QScrollBar:vertical {background:transparent; width:0; margin:0;}
     QScrollBar::handle:vertical {background:#956dac; border-radius:4px; min-height:28px;}
-    QScrollBar:horizontal {background:BG; height:8px;}
+    QScrollBar:horizontal {background:transparent; height:0;}
     QScrollBar::handle:horizontal {background:#956dac; border-radius:4px; min-width:28px;}
     QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {width:0;}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {height:0;}
@@ -139,11 +147,19 @@ def palette(dark=False):
 
 def native_theme(widget, dark=False):
     """Clear upstream inline dark styles before applying shared light/dark tokens."""
-    from PySide6.QtWidgets import QWidget
+    from PySide6.QtWidgets import QWidget,QAbstractScrollArea,QMenu
+    from .cards import round_surface
     background, surface, foreground, _, _, _ = theme_tokens(dark)
     for child in [widget] + widget.findChildren(QWidget):
         child.setStyleSheet("")
         child.setPalette(palette(dark))
+        if isinstance(child,QAbstractScrollArea):
+            child.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            child.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            round_surface(child)
+            round_surface(child.viewport())
+        elif isinstance(child,QMenu):
+            round_surface(child)
     widget.setStyleSheet(stylesheet(dark) +
         " QWidget {background:" + background + ";color:" + foreground + ";}" +
         " QLabel {background:transparent;}" +

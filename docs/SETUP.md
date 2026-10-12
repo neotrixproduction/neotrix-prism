@@ -5,6 +5,17 @@
 3. Open Settings and check your storage roots and application executables.
 4. Open Projects, choose a project and double-click a working file.
 
+The project shelf uses upright cards with perspective and fading side edges.
+Scroll or drag horizontally, or use arrow keys; click a side card to center it,
+then click the centered card or press Enter to open the project. Previous/next
+controls also browse the shelf. Searching projects returns to this view.
+
+The file gallery scrolls vertically without visible scrollbars. Click a card
+for details, double-click or press Enter to open it. Arrow keys, Home/End and
+Page Up/Down work too. Open and Save Version stay visible in the details card;
+More Actions contains Open With, Reveal, Copy Path and Favorite. Longer metadata
+scrolls independently. Reduce Motion in Settings stops scroll/hover animations.
+
 The default library is Relay. Existing project folders are scanned in place.
 No migration is performed. Refresh with F5; scans can be cancelled. Storage
 errors are surfaced, and cached project files remain viewable offline.

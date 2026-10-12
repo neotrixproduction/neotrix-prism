@@ -42,11 +42,11 @@ def test_navigation_filter_favorite_theme(window):
     assert window.workflow_project.count() == 2
     window.open_project(str(project))
     wait()
-    assert window.file_table.rowCount() == 6
+    assert window.file_cards.rowCount() == 6
     combo = window.filters["application"]
     combo.setCurrentText("Blender")
-    assert window.file_table.rowCount() == 2
-    window.file_table.selectRow(0)
+    assert window.file_cards.rowCount() == 2
+    window.file_cards.selectRow(0)
     window.favorite_selected()
     window.navigate("Favorites")
     assert window.favorite_table.rowCount() == 1
@@ -236,4 +236,80 @@ def test_task_orb_position_is_fixed(window):
         wait()
         QTest.qWait(100)
         assert window.orb.mapTo(window,QPoint(42,42)) == anchor
+    assert not messages
+
+
+def test_project_shelf_keyboard_and_file_card_actions(window,monkeypatch):
+    from PySide6.QtWidgets import QTableWidget,QAbstractScrollArea
+    window,project,messages,wait = window
+    window.navigate('Projects')
+    window.browse_projects()
+    assert window.project_views.isVisible() and not window.work_panel.isVisible()
+    assert not window.pages['Projects'].findChildren(QTableWidget)
+    window.project_cards.setFocus()
+    window.project_cards.selectRow(0)
+    QTest.keyClick(window.project_cards,Qt.Key_Return)
+    wait()
+    assert window.work_panel.isVisible() and not window.project_views.isVisible()
+    window.file_cards.selectRow(0)
+    QTest.keyClick(window.file_cards,Qt.Key_Right)
+    assert window.selected()['path']==window.display_files[1]['path']
+    opened=[]
+    monkeypatch.setattr(window,'open_path',lambda path,application=None:opened.append(path))
+    QTest.keyClick(window.file_cards,Qt.Key_Return)
+    assert opened==[window.selected()['path']]
+    for view in window.findChildren(QAbstractScrollArea):
+        assert view.verticalScrollBarPolicy()==Qt.ScrollBarAlwaysOff
+        assert view.horizontalScrollBarPolicy()==Qt.ScrollBarAlwaysOff
+        assert not view.mask().contains(QPoint(0,0))
+    window.project_search.setText('Demo')
+    assert window.project_views.isVisible() and not window.work_panel.isVisible()
+    assert window.project_cards.rowCount()==1
+    assert not messages
+
+
+def test_virtualized_card_gallery_scroll_and_reduced_motion(window):
+    from PySide6.QtCore import QAbstractAnimation,QPointF
+    window,project,messages,wait=window
+    window.open_project(str(project));wait()
+    records=[{**window.display_files[0],'name':f'Creative file {i}.blend','path':f'/fixture/{i}.blend'} for i in range(1000)]
+    window.file_cards.set_entries(records)
+    window.file_cards.selectRow(999)
+    QTest.qWait(30)
+    window.file_cards.grab()
+    assert window.file_cards.offset==window.file_cards.limit()
+    assert len(window.file_cards.hit_boxes)<32
+    assert any(i==999 for i,rect in window.file_cards.hit_boxes)
+    QTest.keyClick(window.file_cards,Qt.Key_Home)
+    assert window.file_cards.offset==0
+    window.settings.data['reduced_motion']=False
+    window.file_cards.scroll_to(window.file_cards.limit())
+    QTest.qWait(60)
+    assert window.file_cards._scroll.state()==QAbstractAnimation.Running
+    window.settings.data['reduced_motion']=True;window.apply_theme()
+    assert window.file_cards._scroll.state()==QAbstractAnimation.Stopped
+    assert window.file_cards.offset==window.file_cards.target
+    assert not messages
+
+
+def test_project_shelf_pointer_centers_then_opens(window):
+    from neotrix_prism.cards import CardSurface
+    window,project,messages,wait=window
+    window.settings.data['reduced_motion']=False
+    shelf=CardSurface(shelf=True,parent=window)
+    shelf.setGeometry(230,160,680,360)
+    shelf.set_entries([{'name':f'Project {i}','path':f'/qa/{i}'} for i in range(20)])
+    shelf.show();shelf.raise_()
+    QTest.qWait(30);shelf.grab()
+    opened=[];shelf.activated.connect(opened.append)
+    rect=next(rect for index,rect in shelf.hit_boxes if index==11)
+    QTest.mouseClick(shelf,Qt.LeftButton,pos=rect.center().toPoint())
+    QTest.qWait(760)
+    assert shelf.offset==pytest.approx(11.0)
+    assert not opened
+    shelf.grab()
+    rect=next(rect for index,rect in shelf.hit_boxes if index==11)
+    QTest.mouseClick(shelf,Qt.LeftButton,pos=rect.center().toPoint())
+    assert opened==[11]
+    shelf.close();shelf.deleteLater()
     assert not messages

@@ -8,7 +8,9 @@ The interface uses a continuous purple-to-indigo background, luminous tinted
 tiles, dimensional original icons and choreographed motion inspired by the current
 CleanMyMac design. Both appearances use colored surfaces; the dark variant
 reduces brightness. Sidebar, file lists, settings and native Prism dialogs share
-the same palette.
+the same palette. Projects use a perspective card shelf with fading edges;
+working files use an animated card gallery instead of tables. Scroll, drag or
+use arrow keys to browse. Scrollbars are hidden across Neotrix surfaces.
 
 The rounded Windows shell includes custom window controls, draggable caption,
 edge resizing and a collapsible animated sidebar. The five-tile home uses
@@ -22,10 +24,16 @@ Manrope provides heading and body typography with distinct sizes and weights.
 The OFL font files and license are bundled; no font installation is required.
 See [Motion and visual reference](docs/MOTION.md).
 
+Creative applications use thick 3D artwork based on their actual installed app
+icons. The transparent assets and complete generation prompts are in
+[assets/app-icons](assets/app-icons/SOURCE.json). These are rendered PNG assets,
+not mesh models. Existing preview images are used without launching applications.
+
 [Watch the real Qt motion preview](docs/screenshots/motion.mp4).
 
 ![Neotrix workspace](docs/screenshots/home.png)
 ![Working files across applications](docs/screenshots/projects.png)
+![Perspective project shelf](docs/screenshots/project-library.png)
 ![Independent file-workflow editor](docs/screenshots/workflows.png)
 
 ## Run on Windows
@@ -46,7 +54,7 @@ See [Setup](docs/SETUP.md) for opening files, version saving and shared workflow
 
 ## Included
 
-- Project cards/list views, search, favorites and recent projects.
+- Perspective project cards, a virtualized file gallery, search, favorites and recent projects.
 - Application, department, variant, shot, stage and version filters.
 - Working-file and output views, existing image previews and application icons.
 - Open, Open With, Reveal Folder and Copy Path actions.

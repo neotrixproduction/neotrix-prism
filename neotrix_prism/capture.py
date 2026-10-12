@@ -13,21 +13,26 @@ def capture(window, directory, application):
         project = next((p for p in recent if p in window.projects), window.projects[0])
         window.open_project(project)
     index = [0]
+    def finish():
+        window.grab().save(str(output/'project-library.png'))
+        atomic_json(output / "capture.json", {"pages": pages, "project_library":True,"size": [window.width(), window.height()],
+                                              "scale": window.devicePixelRatioF(), "theme": window.settings.data["theme"],
+                                              "files": len(window.files), "projects": len(window.projects)})
+        window.close()
+        application.quit()
     def next_page():
         if window.jobs:
             QTimer.singleShot(300, next_page)
             return
         if index[0] == len(pages):
-            atomic_json(output / "capture.json", {"pages": pages, "size": [window.width(), window.height()],
-                                                  "scale": window.devicePixelRatioF(), "theme": window.settings.data["theme"],
-                                                  "files": len(window.files), "projects": len(window.projects)})
-            window.close()
-            application.quit()
+            window.navigate('Projects')
+            window.browse_projects()
+            QTimer.singleShot(220,finish)
             return
         page = pages[index[0]]
         window.navigate(page)
-        if page == "Projects" and window.file_table.rowCount():
-            window.file_table.selectRow(0)
+        if page == "Projects" and window.file_cards.rowCount():
+            window.file_cards.selectRow(0)
         def grab():
             window.grab().save(str(output / (page.lower() + ".png")))
             index[0] += 1

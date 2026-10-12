@@ -37,7 +37,10 @@ if "--interactive" in sys.argv:
               "position": [window.x(),window.y()], "size":[window.width(),window.height()],
               "maximized":window.isMaximized(),"minimized":window.isMinimized(),
               "move_result":getattr(window.caption,'move_result',None),
-              "resize_result":getattr(window.resize_frame,'resize_result',None)}))
+              "resize_result":getattr(window.resize_frame,'resize_result',None),
+              "shelf_offset":window.project_cards.offset,"shelf_target":window.project_cards.target,
+              "shelf_selected":window.project_cards.selected_index,"shelf_shelf":window.project_cards.shelf,
+              "reduced_motion":window.settings.data['reduced_motion']}))
     monitor=QTimer();monitor.timeout.connect(state);monitor.start(200)
     state()
     app.exec()
@@ -66,13 +69,19 @@ actions = [(0, lambda: window.navigate('Home'), 'Staggered Home reveal'),
            (2300, lambda: (hover(tiles[0], False), hover(tiles[1], True)), 'Workflow tile spring'),
            (3000, lambda: (hover(tiles[1], False), window.toggle_sidebar()), 'Sidebar collapse'),
            (3700, lambda: QTest.mouseClick(project_control, Qt.LeftButton), 'Tile-to-page expansion'),
-           (4700, lambda: window.open_project(str(project)), 'Project scan'),
-           (5300, lambda: window.file_table.selectRow(0), 'File details reveal'),
-           (6000, lambda: window.navigate('Workflows'), 'Directional workflow transition'),
-           (6800, window.toggle_sidebar, 'Sidebar expand'),
-           (7400, lambda: window.navigate('Home'), 'Return and staggered introduction'),
-           (8500, busy, 'Task orb morph and dual progress ring'),
-           (10000, lambda: QTest.mouseClick(window.orb, Qt.LeftButton), 'Task cancellation')]
+           (4800, lambda: window.project_cards.scroll_to(0), 'Project shelf depth and edge fade'),
+           (5700, lambda: window.project_cards.scroll_to(2), 'Project shelf spring scroll'),
+           (6500, lambda: window.open_project(str(project)), 'Project scan and file card gallery'),
+           (7400, lambda: window.file_cards.selectRow(0), 'File card selection and details'),
+           (8000, lambda: QTest.mouseMove(window.file_cards,window.file_cards.rect().center()), 'Card hover depth'),
+           (9000, lambda: window.file_cards.scroll_to(window.file_cards.limit()), 'File gallery scrolling'),
+           (9800, lambda: window.file_cards.selectRow(window.file_cards.rowCount()-1), 'Last file card'),
+           (10800, lambda: window.file_cards.selectRow(0), 'Keyboard-style return to first card'),
+           (11700, lambda: window.navigate('Workflows'), 'Directional workflow transition'),
+           (12500, window.toggle_sidebar, 'Sidebar expand'),
+           (13200, lambda: window.navigate('Home'), 'Return and staggered introduction'),
+           (14300, busy, 'Task orb morph and dual progress ring'),
+           (15800, lambda: QTest.mouseClick(window.orb, Qt.LeftButton), 'Task cancellation')]
 
 def capture():
     elapsed = clock.elapsed()
@@ -82,7 +91,7 @@ def capture():
         events.append({"ms": elapsed, "event": title})
     if '--performance' in sys.argv:
         times.append(elapsed)
-        if elapsed >= 11200:
+        if elapsed >= 17000:
             timer.stop()
             gaps = sorted(b-a for a,b in zip(times,times[1:]))
             (output/'responsiveness.json').write_text(json.dumps({'ticks':len(times),'duration_ms':elapsed,
@@ -100,12 +109,12 @@ def capture():
     canvas.paste(image, (16, 16), image)
     frames.append(canvas)
     times.append(elapsed)
-    if elapsed >= 11200:
+    if elapsed >= 17000:
         timer.stop()
         durations = [max(20, b-a) for a,b in zip(times, times[1:])] + [50]
         frames[0].save(output/'neotrix-motion.gif', save_all=True, append_images=frames[1:],
                        duration=durations, loop=0, optimize=False)
-        for ms in (400, 1400, 1900, 3900, 6200, 7900, 9200):
+        for ms in (400, 1400, 1900, 3900, 5300, 7800, 9600, 13800, 15000):
             index = min(range(len(times)), key=lambda i:abs(times[i]-ms))
             frames[index].save(output/f'frame-{ms}.png')
         # Encode the original RGB captures, not the palette-limited GIF, so

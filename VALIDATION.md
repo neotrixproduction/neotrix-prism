@@ -86,6 +86,23 @@
 - The regression check compares the exact center coordinates before, during
   and after a canceled task, with long status text at 1360 x 900 and 1024 x 720.
 
+## 0.4.0 card browsing and 3D app artwork
+
+- 29 automated tests pass, including project-shelf pointer centering/opening,
+  card keyboard activation, preserved filtering/actions, a virtualized 1,000-file
+  gallery, end-of-list scrolling and reduced-motion interruption. The previous
+  fixed Explore/Stop position checks remain in the suite.
+- UI checks pass at 200% scaling. Desktop captures include the six navigation
+  pages plus the project shelf, both appearances, 100/150/200% and minimum size.
+- App icons were referenced from installed executables and generated individually
+  with the built-in tool. All five PNGs preserve alpha; corner pixels are fully
+  transparent. Their branding and thick body shapes were visually reviewed.
+- High-DPI card pixmaps use the full physical source rectangle. Details previews
+  fit the available logical height, including after window resizing.
+- File preview decoding and icon caches remain bounded. No creative app is
+  launched to create gallery thumbnails. Existing open/save services are retained.
+- Advanced native Prism/DCC interfaces retain the host-validation limits below.
+
 ## Remaining host/environment checks
 
 - A true two-workstation pilot has not been run. The SMB concurrency test used

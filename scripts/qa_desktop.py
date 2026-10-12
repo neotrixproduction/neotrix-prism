@@ -24,7 +24,8 @@ for relative in files:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not path.exists():
         path.write_bytes(b"Neotrix UI indexing fixture. Do not open as a creative document.")
-for name in ("Neotrix Brand System", "Neotrix Motion Library", "Neotrix Product Launch"):
+for name in ("Neotrix Brand System", "Neotrix Motion Library", "Neotrix Product Launch",
+             "Neotrix Character Lab","Neotrix Design Library","Neotrix Studio Series","Neotrix Title Design"):
     (root / name).mkdir(parents=True, exist_ok=True)
 app = QApplication([])
 settings = Settings()
