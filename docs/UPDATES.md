@@ -52,5 +52,12 @@ The published 0.6.0 GitHub ZIP predates this updater. Download and extract the
 Validated with mocked downloads/checksums, cancellation and hostile archive paths;
 real Windows helper tests cover successful replacement and failed-runtime rollback
 in temporary folders. The public GitHub release listing was also checked live.
-A download/install/restart against a newly published full-runtime release remains
-a release-validation step.
+Live validation against the published 0.6.5 ZIP passed on 14 October 2026 for
+both Update & restart and Install on close. The update-enabled 0.6.0 development
+baseline discovered and downloaded the public release, verified its SHA-256,
+installed the complete runtime, passed the executable self-test and preserved
+preferences, favorites, storage roots and project files. Restart reopened 0.6.5;
+Install on close did not reopen it. Previous installations remained available
+for rollback, and 0.6.5 correctly reported up to date. No updater repair was needed.
+See [the validation record](UPDATE_VALIDATION_0.6.5.json). The original published
+0.6.0 preview was not this baseline and still requires manual installation.
