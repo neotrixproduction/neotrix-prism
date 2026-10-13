@@ -8,7 +8,7 @@ from .storage import atomic_json, read_json, fingerprint, exclusive_lock, user_d
 # 'other' keeps its key so existing shared assignments remain valid; its folder is OTHERS.
 STAGES = {'modelling': 'Modelling', 'rigging': 'Rigging', 'layout': 'Layout', 'animation': 'Animation',
           'fx': 'FX', 'lighting': 'Lighting', 'compositing': 'Compositing', 'other': 'Others',
-          'unassigned': 'Unassigned'}
+          'unassigned': 'Others'}
 STAGE_NOTES = {'modelling': 'Shot-specific modelling and geometry work.',
                'rigging': 'Shot-specific rigs, controls and deformation setup.',
                'layout': 'Shot cameras, composition, staging and rough timing.',
@@ -35,12 +35,12 @@ def inferred_stage(file):
     if '3d' in parts and 'assets' in parts and 'projects' in parts:
         return 'modelling'
     if '3d' in parts and 'shots' in parts and 'projects' in parts:
-        return 'unassigned'
+        return 'other'
     aliases = {'Modeling': 'modelling', 'Rigging': 'rigging', 'Layout': 'layout', 'Animation': 'animation',
                'FX': 'fx', 'Lighting': 'lighting', 'Post': 'compositing'}
     if file.get('stage') in aliases and file.get('department') != 'Post':
         return aliases[file['stage']]
-    return 'unassigned' if file.get('stage') == 'Unspecified' and file.get('department') == '3D' else 'other'
+    return 'other'
 
 
 def stage_folder(file):
@@ -104,7 +104,8 @@ class StageStore:
 
     def stage(self, file, document):
         relative = file['relative'].replace('\\','/')
-        return document.get('assignments', {}).get(relative, inferred_stage(file))
+        stage = document.get('assignments', {}).get(relative, inferred_stage(file))
+        return 'other' if stage == 'unassigned' else stage
 
 
 def inheritance_snapshot(source, project=None):

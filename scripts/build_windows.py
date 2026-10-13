@@ -26,8 +26,10 @@ def main():
     shutil.copytree(ROOT / "assets", PACKAGE / "assets", dirs_exist_ok=True)
     (PACKAGE / "scripts").mkdir(exist_ok=True)
     shutil.copy2(ROOT / "scripts/install-integrations.ps1", PACKAGE / "scripts/install-integrations.ps1")
-    for name in ('create-shortcut.ps1','functional_runtime_smoke.py','windows_launcher.cs'):
+    for name in ('create-shortcut.ps1','functional_runtime_smoke.py','windows_launcher.cs','apply-update.ps1'):
         shutil.copy2(ROOT/'scripts'/name,PACKAGE/'scripts'/name)
+    (PACKAGE/'portable.json').write_text(json.dumps({'product':'Neotrix.Prism','platform':'windows-x64',
+                                                   'version':__version__}),encoding='utf-8')
     compiler = Path(os.environ['WINDIR'])/'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
     subprocess.run([str(compiler),'/nologo','/target:winexe','/platform:x64',
                     '/reference:System.Windows.Forms.dll',

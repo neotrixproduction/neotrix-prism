@@ -176,6 +176,17 @@ def stylesheet(dark=True):
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {height:0;}
     QProgressBar {background:rgba(255,255,255,30); border:none; border-radius:4px; max-height:7px; text-align:center;}
     QProgressBar::chunk {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba(255,255,255,120),stop:1 #ffffff); border-radius:4px;}
+    QLabel#statusLine {color:rgba(236,230,246,150); font-size:12px; background:transparent;}
+    QPushButton#quietAction {background:transparent; border:none; color:rgba(236,230,246,150); font-size:12px; font-weight:500; padding:4px 10px; border-radius:8px;}
+    QPushButton#quietAction:hover {color:#ffffff; background:rgba(255,255,255,14);}
+    QPushButton#quietAction:pressed {background:rgba(255,255,255,24);}
+    QSlider {background:transparent; min-height:22px;}
+    QSlider::groove:horizontal {height:6px; border-radius:3px; background:rgba(255,255,255,30);}
+    QSlider::sub-page:horizontal {height:6px; border-radius:3px; background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 rgba(255,255,255,120),stop:1 #ffffff);}
+    QSlider::handle:horizontal {width:16px; height:16px; margin:-5px 0; border-radius:8px; background:#ffffff; border:1px solid rgba(255,255,255,230);}
+    QSlider::handle:horizontal:hover {background:#f4efff;}
+    QSlider::sub-page:horizontal:disabled {background:rgba(255,255,255,40);}
+    QSlider::handle:horizontal:disabled {background:rgba(255,255,255,90); border-color:rgba(255,255,255,40);}
     QToolTip {background:#1d1636; color:TEXT; border:1px solid rgba(255,255,255,50); padding:8px;}
     QCheckBox {spacing:10px;}
     QCheckBox::indicator {width:18px; height:18px; border-radius:6px; border:1px solid rgba(255,255,255,90); background:rgba(255,255,255,22);}

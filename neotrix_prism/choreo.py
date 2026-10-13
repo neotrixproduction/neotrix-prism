@@ -5,12 +5,13 @@ pixel-aligned, and disappear entirely once they settle.
 """
 import math
 import time
-from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QEvent, QSize
+from PySide6.QtCore import Qt, QRectF, QPointF, QLineF, QEvent, QSize, QVariantAnimation, QAbstractAnimation
 from PySide6.QtGui import (QPainter, QColor, QPen, QBrush, QLinearGradient, QRadialGradient,
                            QPainterPath, QFontMetricsF, QFont)
 from PySide6.QtWidgets import QWidget, QLabel, QAbstractScrollArea
 from . import physics
-from .motion import clock, enabled, snap, soften
+from .motion import clock, enabled, snap, soften, spring
+from .physics import SNAPPY
 
 
 def _clamp(value, low=0.0, high=1.0):
@@ -119,6 +120,133 @@ class KineticLabel(QLabel):
             p.setOpacity(_clamp(local/150))
             p.drawText(QPointF(snap(x+self.tracking*(i-centre)*(1-k), dpr),
                                snap(baseline+self.rise*(1-k), dpr)), ch)
+
+
+class StatusLine(KineticLabel):
+    """The footer status: one quiet line that elides in the middle (the full
+    text becomes its tooltip) and rolls in gently instead of announcing."""
+
+    def __init__(self, text=''):
+        super().__init__('', None, rise=8, stagger=5, tracking=0, quiet=450)
+        self.full = ''
+        self.setWordWrap(False)
+        self.setText(text)
+
+    def fitted(self, text):
+        width = max(40, self.contentsRect().width())
+        return QFontMetricsF(self.font()).elidedText(text, Qt.ElideMiddle, width)
+
+    def setText(self, text):
+        self.full = text
+        shown = self.fitted(text)
+        self.setToolTip(text if shown != text else '')
+        super().setText(shown)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        shown = self.fitted(self.full)
+        if shown != QLabel.text(self):
+            QLabel.setText(self, shown)  # re-fit silently; only new text animates
+            self.setToolTip(self.full if shown != self.full else '')
+
+
+class Hairline(QWidget):
+    """Indeterminate progress as a 2 px line of light: a soft comet glides
+    along a faint track, tinted by the live scene, and the whole line fades
+    in and out on a spring. Mouse-transparent; quiet by design."""
+
+    PERIOD = 1700
+
+    def __init__(self, parent=None, width=150):
+        super().__init__(parent)
+        self.setFixedSize(width, 14)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.presence, self.phase, self.active = 0.0, .5, False
+        self.travel = QVariantAnimation(self)
+        self.travel.setStartValue(0.0)
+        self.travel.setEndValue(1.0)
+        self.travel.setDuration(self.PERIOD)
+        self.travel.setLoopCount(-1)
+        self.travel.valueChanged.connect(self.advance)
+        super().hide()
+
+    def advance(self, value):
+        self.phase = float(value)
+        self.update()
+
+    def set_active(self, active):
+        """Show while work runs; the line fades out after it ends."""
+        self.active = bool(active)
+        if not enabled(self):
+            self.travel.stop()
+            self.presence, self.phase = (1.0 if active else 0.0), .5
+            self.setVisible(self.active)
+            return
+        if self.active:
+            self.show()
+            if self.travel.state() != QAbstractAnimation.State.Running:
+                self.travel.start()
+        def fade(value):
+            self.presence = max(0.0, float(value))
+            self.update()
+        def settled():
+            if not self.active:
+                self.travel.stop()
+                self.hide()
+        spring(self, 'presence', 1.0 if self.active else 0.0, fade, value=self.presence,
+               feel=SNAPPY if self.active else (.5, 1.0), done=settled)
+
+    def pause(self, paused):
+        """Hold the comet while the window is minimised."""
+        state = self.travel.state()
+        if paused:
+            if state == QAbstractAnimation.State.Running:
+                self.travel.pause()
+        elif self.active and self.isVisible() and enabled(self):
+            if state == QAbstractAnimation.State.Paused:
+                self.travel.resume()
+            elif state == QAbstractAnimation.State.Stopped:
+                self.travel.start()
+
+    def hideEvent(self, event):
+        self.travel.stop()
+        super().hideEvent(event)
+
+    def paintEvent(self, event):
+        if self.presence <= .01:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w, y = self.width(), self.height()/2
+        surface = getattr(self.window(), 'surface', None)
+        tint = surface.scene_colors()[1].lighter(430) if surface is not None and hasattr(surface, 'scene_colors') else QColor('#d9d2ff')
+        def colour(base, alpha):
+            result = QColor(base)
+            result.setAlpha(int(max(0, min(255, alpha*self.presence))))
+            return result
+        p.setPen(QPen(colour(QColor(255, 255, 255), 20), 1.5, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(QPointF(2, y), QPointF(w-2, y))
+        # The comet eases across (slow at the edges, quick through the middle),
+        # entering and leaving beyond the ends so the line never ticks.
+        u = self.phase
+        eased = .5-.5*math.cos(math.pi*u)
+        length = w*.36
+        head = -length*.4+(w+length*.8)*eased
+        trail = QLinearGradient(head-length, y, head, y)
+        trail.setColorAt(0, colour(tint, 0))
+        trail.setColorAt(.7, colour(tint, 120))
+        trail.setColorAt(1, colour(QColor(255, 255, 255), 230))
+        start, end = max(2.0, head-length), min(w-2.0, head)
+        if end <= start:
+            return
+        p.save()
+        p.setClipRect(QRectF(1, 0, w-2, self.height()))
+        for width, alpha in ((6, .22), (2, 1.0)):
+            pen = QPen(QBrush(trail), width, Qt.SolidLine, Qt.RoundCap)
+            p.setOpacity(alpha)
+            p.setPen(pen)
+            p.drawLine(QPointF(start, y), QPointF(end, y))
+        p.restore()
 
 
 class Shockwave(QWidget):

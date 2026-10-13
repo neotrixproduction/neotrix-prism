@@ -1,10 +1,10 @@
 """Interaction-driven Qt motion. Springs keep their velocity across interruptions,
 every effect settles at rest, and reduced motion snaps straight to the end state."""
 import math
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QSize, QPointF, QPoint
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QSize, QSizeF, QPointF, QPoint, QObject, QEvent
 from PySide6.QtGui import QPainter, QColor, QPen, QLinearGradient, QRadialGradient, QConicalGradient, QPainterPath, QIcon
 from PySide6.QtWidgets import (QPushButton, QWidget, QStylePainter, QStyleOptionButton, QStyle, QGraphicsEffect,
-                               QScrollArea, QSplitter, QSplitterHandle)
+                               QScrollArea, QSplitter, QSplitterHandle, QAbstractScrollArea)
 from . import physics
 from .physics import SNAPPY, POP, FLUID
 
@@ -325,6 +325,169 @@ class PageEffect(QGraphicsEffect):
         painter.restore()
 
 
+class HiddenEffect(QGraphicsEffect):
+    """Paints nothing: the block stays in place and interactive while its
+    ghost rides the wave on the ripple layer."""
+    def draw(self, painter):
+        pass
+
+
+class RippleLayer(QWidget):
+    """Panels ride the refresh wave on a layer over the whole workspace.
+
+    A widget cannot paint outside its parent, so moving controls in place
+    crops them at their container's edge. Instead, when the wave front
+    reaches a block, its snapshot (its "ghost") is drawn here, pushed away
+    from the orb and rebounding once (physics.ripple), while the block itself
+    is hidden but stays in place and interactive. Ghosts are clipped only by
+    a scrolling viewport they belong to. Glyphs only translate, pixel-aligned.
+    """
+    motion_layer = True
+
+    def __init__(self, host, blocks, origin, speed=1650.0, push=8.0):
+        super().__init__(host)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setGeometry(host.rect())
+        self.ghosts = []
+        for block in blocks:
+            effect, parent = block.graphicsEffect(), block.parentWidget()
+            while parent is not None and parent is not host and not parent.graphicsEffect():
+                parent = parent.parentWidget()
+            if effect is not None or (parent is not None and parent.graphicsEffect()):
+                continue  # mid-reveal or inside a transition: leave it be
+            at = QPointF(block.mapTo(host, QPoint(0, 0)))
+            centre = at+QPointF(block.width()/2, block.height()/2)
+            delta = centre-QPointF(origin)
+            length = math.hypot(delta.x(), delta.y()) or 1.0
+            clip = QRectF(self.rect())
+            scroller = block.parentWidget()
+            while scroller is not None and scroller is not host:
+                if isinstance(scroller, QAbstractScrollArea):
+                    viewport = scroller.viewport()
+                    clip = QRectF(QPointF(viewport.mapTo(host, QPoint(0, 0))), QSizeF(viewport.size()))
+                    break
+                scroller = scroller.parentWidget()
+            self.ghosts.append({'block': block, 'at': at, 'clip': clip, 'delay': length/speed*1000,
+                                'direction': QPointF(delta.x()/length, delta.y()/length),
+                                'pixmap': None, 'effect': None, 'offset': QPointF(), 'done': False})
+        delays = [g['delay'] for g in self.ghosts] or [0.0]
+        self.first, self.last, self.push = min(delays), max(delays), push
+        self.show()
+        self.raise_()
+        clock(self, '_ripple', physics.RIPPLE_MS+self.last+20, self.advance, self.finish)
+
+    def advance(self, elapsed):
+        for ghost in self.ghosts:
+            if ghost['done']:
+                continue
+            local = elapsed-ghost['delay']
+            if local <= 0:
+                continue
+            block = ghost['block']
+            try:
+                if ghost['pixmap'] is None:
+                    # Captured as the front arrives, so the ghost matches the block.
+                    ghost['pixmap'] = snapshot(block)
+                    ghost['effect'] = HiddenEffect(block)
+                    block.setGraphicsEffect(ghost['effect'])
+                if local >= physics.RIPPLE_MS:
+                    self.release(ghost)
+                    continue
+            except RuntimeError:
+                ghost['done'] = True
+                continue
+            amount, _ = physics.ripple(local)
+            strength = 1-.3*((ghost['delay']-self.first)/(self.last-self.first) if self.last > self.first else 0.0)
+            ghost['offset'] = ghost['direction']*(self.push*amount*strength)+QPointF(0.0, -3*max(0.0, amount)*strength)
+        self.update()
+
+    def release(self, ghost):
+        ghost['done'] = True
+        try:
+            if ghost['effect'] is not None and ghost['block'].graphicsEffect() is ghost['effect']:
+                ghost['block'].setGraphicsEffect(None)
+        except RuntimeError:
+            pass
+        ghost['pixmap'] = None
+
+    def finish(self):
+        animation = getattr(self, '_ripple', None)
+        if animation:
+            animation.stop()
+        for ghost in self.ghosts:
+            if not ghost['done']:
+                self.release(ghost)
+        host = self.parentWidget()
+        if host is not None and getattr(host, '_ripple_layer', None) is self:
+            host._ripple_layer = None
+        self.hide()
+        self.deleteLater()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+        dpr = self.devicePixelRatioF()
+        for ghost in self.ghosts:
+            if ghost['done'] or ghost['pixmap'] is None:
+                continue
+            p.save()
+            p.setClipRect(ghost['clip'])
+            at = ghost['at']+ghost['offset']
+            p.drawPixmap(QPointF(snap(at.x(), dpr), snap(at.y(), dpr)), ghost['pixmap'])
+            p.restore()
+
+
+class SmoothWheel(QObject):
+    """Spring wheel scrolling for any scroll area: each notch glides (GLIDE)
+    and a glide in flight is retargeted, never restarted or snapped."""
+
+    def __init__(self, area, step=110.0):
+        super().__init__(area)
+        self.area, self.step, self.target = area, step, None
+        area.viewport().installEventFilter(self)
+        area.verticalScrollBar().valueChanged.connect(self.sync)
+        self.applying = False
+
+    def sync(self, value):
+        if not self.applying:
+            physics.cancel(self, 'wheel')
+            self.target = None
+
+    def eventFilter(self, watched, event):
+        if event.type() != QEvent.Wheel or not enabled(self.area) or event.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier):
+            return False
+        bar = self.area.verticalScrollBar()
+        delta = event.angleDelta().y()
+        if not delta or bar.maximum() <= bar.minimum():
+            return False
+        start = float(bar.value()) if self.target is None else self.target
+        self.target = max(float(bar.minimum()), min(float(bar.maximum()), start-delta/120*self.step))
+        def apply(value):
+            self.applying = True
+            bar.setValue(round(value))
+            self.applying = False
+        def done():
+            self.target = None
+        current = physics.get(self, 'wheel')
+        spring(self, 'wheel', self.target, apply, value=None if current else float(bar.value()), feel=physics.GLIDE, precision=.3, done=done)
+        return True
+
+
+def ripple_blocks(host, blocks, origin, speed=1650.0, push=10.0):
+    """Start (or restart) the panel ripple for `blocks`, from `origin` in host coordinates."""
+    old = getattr(host, '_ripple_layer', None)
+    if old is not None:
+        try:
+            old.finish()
+        except RuntimeError:
+            pass
+    host._ripple_layer = None
+    if not enabled(host) or not blocks:
+        return None
+    host._ripple_layer = RippleLayer(host, blocks, origin, speed, push)
+    return host._ripple_layer
+
+
 def reveal_page(widget, delay=0, rise=22, start=0.0, feel=FLUID):
     """Bring a block in with a rise; an interrupted reveal continues from where it is."""
     physics.cancel(widget, 'reveal')
@@ -463,7 +626,9 @@ class OrbButton(MotionButton):
     """Workspace-tinted glass with an honest task-driven progress ring."""
     def __init__(self, text="Refresh", parent=None):
         super().__init__(text, parent)
-        self.setFixedSize(84, 84)
+        # The glass body stays 68 px; reserve transparent paint room for its
+        # spring overshoot, breathing halo and the wider busy/focus rings.
+        self.setFixedSize(112, 112)
         self.setAccessibleName("Refresh projects")
         self.busy, self.angle = False, 0.0
         self.activity = 0.0
@@ -520,7 +685,8 @@ class OrbButton(MotionButton):
         settle = max(0.0, min(1.0, self.reveal*1.6-.6))
         swap = max(0.0, min(1.2, self.swap))
         clip = QPainterPath()
-        clip.addEllipse(QRectF(9, 9, 66, 66))
+        center = box.center()
+        clip.addEllipse(QRectF(center.x()-33, center.y()-33, 66, 66))
         p.setClipPath(clip)
         p.setPen(QColor("#ffffff"))
         if self.previous_text and swap < 1:
@@ -545,7 +711,7 @@ class OrbButton(MotionButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         p.save()
-        p.translate(42, 42)
+        p.translate(self.width()/2, self.height()/2)
         scale = (1 + .10 * self.hover - .09 * self.press + .035*self.activity + .08*self.pop + .018*breath)*max(0.0, self.reveal)
         p.scale(scale, scale)
         glow = QRadialGradient(0, 0, 41)

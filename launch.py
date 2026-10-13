@@ -35,6 +35,8 @@ def main():
     parser.add_argument("--comments", help="Open shared discussion for a saved file")
     parser.add_argument("--comment-app", default="Neotrix Prism")
     args = parser.parse_args()
+    if args.app!='Standalone' or args.capture_dir or args.comments:
+        os.environ['NEOTRIX_DISABLE_UPDATE_CHECK']='1'
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
     from neotrix_prism.ui import MainWindow

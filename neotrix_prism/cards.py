@@ -43,6 +43,8 @@ def round_surface(widget):
 class CardSurface(QWidget):
     selection_changed = Signal()
     activated = Signal(int)
+    hovered = Signal(int)  # pointer arrived on a card (index); drives hover sound
+    pressed = Signal(int)  # pointer pressed a card (index)
 
     def __init__(self, shelf=False, parent=None):
         super().__init__(parent)
@@ -143,6 +145,8 @@ class CardSurface(QWidget):
         self.hover=1.0 if index>=0 else 0.0
         if index<0:
             self.track_tilt(None)
+        else:
+            self.hovered.emit(index)
 
     def set_press_index(self,index):
         for previous,target in ((self.press_index,0.0),(index,1.0)):
@@ -232,6 +236,8 @@ class CardSurface(QWidget):
             physics.cancel(self,'scroll')
             self.target = self.offset
             self.set_press_index(self.index_at(event.position()))
+            if self.press_index>=0:
+                self.pressed.emit(self.press_index)
             event.accept()
 
     def mouseMoveEvent(self,event):

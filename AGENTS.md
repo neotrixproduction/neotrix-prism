@@ -21,3 +21,10 @@ audit and testing on 2026-10-13.
 - Every current page needs a visible refresh response. Home and its decorative panel have been removed; Projects is the opening page.
 - Opening a project shows Assets | Versions/Working files | Preview, in that order. Assets is grouped client material plus the authoritative brief; production assets stay in Working files. Preview groups Full/per-shot and only shows MP4/MOV. Reuse existing GridCards/ZoomThrough/ambient responses at every level; no separate animation or visual system.
 - Keep the handoff note updated when revising this animation.
+
+## Interface sound
+
+- The user asked on 2026-10-13 for soothing, engaging and immersive sound for every animation and click; it must feel premium. Read [docs/SOUND.md](docs/SOUND.md) before changing sound.
+- Cues are synthesized by `scripts/build_sounds.py` into `assets/sounds`: 48 kHz stereo WAV in one key (E-flat major pentatonic) and one shared synthetic room. Regenerate them with that script instead of hand-editing or adding outside samples.
+- Each new animation or interaction gets a cue through `self.sound` (`neotrix_prism/sound.py`), timed to the motion's key moment. Pan positional cues by window x; keep hover cues quiet and rate-limited.
+- Sound must never stall the UI thread (push-mode voice pool) and stays silent when muted, offscreen or under pytest (`NEOTRIX_SOUND` overrides).

@@ -11,9 +11,13 @@ creative-application integrations. See [START_HERE.md](../START_HERE.md) for ano
 Projects use equal-size cards with equal spacing. Click a card or press Enter.
 After opening a project, the cards are ordered **Assets | Versions | Preview**.
 For projects without named campaign versions, **Working files** replaces Versions.
-Versions opens named campaign choices (such as Vertical or Summer), followed by
-production stages. Working files goes directly to stages. General contains files
+Versions opens named campaign choices (including existing legacy version names), followed by
+work areas: **3D, Graphic Design, Motion Graphic and AI Generation**. Working files goes
+directly to work areas. General contains files
 without a named version.
+3D then offers stage choices. The other areas open their file lists immediately.
+Other work appears when legacy or non-WORK documents need access. Folder names
+and existing version inference are preserved; no production files are moved.
 Save revisions such as v001 remain visible in the final file list.
 
 Assets focuses on client materials: Fonts, Logos, Design guide, Brief, Packaging,
@@ -46,9 +50,26 @@ remain cached offline; Refresh updates them. The template placeholder lives at
 `N:\Projects\Template\COMMERCIAL_ADS_TEMPLATE_V3\_TOOLS\icon\project.png`.
 
 Modelling is inferred from `3D/ASSETS/projects`; Compositing from shot
-`COMPOSITING/projects`. Shot `PROJECTS` files begin as Unassigned because the
-same folder contains layout and lighting scenes. Assign those stages explicitly.
-Other work keeps graphics, motion graphics and legacy files accessible.
+`COMPOSITING/projects`. Shot files in `PROJECTS/<STAGE>` inherit that stage. Loose
+shot `PROJECTS` files appear in **Others**, alongside legacy `unassigned` labels.
+Assign stages explicitly when needed; existing shared labels remain compatible.
+Graphics and motion graphics have their own work-area cards.
+
+## AI Generation and file actions
+
+AI Generation reads `03_PRODUCTION/WORK/AI_GENERATION` and its `inputs`, `workflows`,
+`outputs` and `handoff_archives` folders. The list defaults to All files and offers
+category filters, including prompts and workflow JSON/YAML, images, videos, audio
+and archives. It opens files using installed applications or Windows associations;
+it does not execute workflows or run AI generation. Received client assets remain
+in the separate Assets section. Only generated MP4/MOV outputs enter Preview,
+not videos used as AI inputs.
+
+The detail panel offers **Open file** and **Reveal in Explorer**. Reveal is no
+longer duplicated in More actions, and Save version is removed from this panel.
+Application integrations and native Prism tools retain their version-save services.
+Read / write comments opens a rounded, scene-tinted discussion window. Shared
+comments retain the existing schema and location; loading and posting run in workers.
 
 Stage assignments are shared in `_TOOLS/neotrix-prism/stages.json`, using paths
 relative to the project. Files stay in their existing folders. Concurrent edits
@@ -92,6 +113,19 @@ If saving from a selected desktop file, that same file must be active in the
 application. Illustrator and Fusion version saving is outside this preview.
 
 ## Maintenance
+
+Favorites are stored separately in `%LOCALAPPDATA%/NeotrixPrism/favorites.json`.
+The first launch migrates existing favorites and creates an automatic backup.
+Preference saves use an operating-system lock and merge favorite additions and
+removals, so another open window cannot erase them with stale settings. Missing
+or disconnected files remain favorited. Keep this per-user directory when moving
+to another PC; portable application updates do not replace it.
+
+Automatic snapshots are in `preference-backups` (the latest 50 favorites
+snapshots and 20 settings snapshots). Damaged JSON falls back to a valid backup;
+its original bytes are preserved before repair. In Favorites, **Restore favorites…**
+merges a selected snapshot with the current list without discarding existing items.
+Back up this directory externally too if you need recovery after disk failure.
 
 Local settings and history are under LocalAppData/NeotrixPrism. Include project `_TOOLS/neotrix-prism` metadata and managed projects'
 00_Pipeline configuration in your backup. Existing graph documents are retained

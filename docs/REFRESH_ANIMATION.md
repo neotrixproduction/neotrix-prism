@@ -22,6 +22,11 @@ descriptions in MOTION.md and existing screenshots can describe superseded UI.
   `Atmosphere.palette_changed` repaints the orb on palette and refresh-light
   changes. Do not restore a fixed pink tint or maintain a separate page-color map
   for the orb. Keep its label outside the transformed artwork paint region.
+- Hover clipping fix: the 68 px glass body paints in a centered 112 × 112
+  transparent canvas, with matching footer height. This reserves room for halo,
+  spring overshoot and busy/focus rings; the label clip stays centered at 66 px.
+  Do not shrink the canvas back to 84 px or clip it with a shorter footer.
+  Body size, tint and motion curves are unchanged.
 - Second round (same day): the user asked for idle colour-gradient animation,
   more waves of colour, more size change, more fluid motion, professional 3D
   project artwork that rotates and hovers in 3D, and readable contrast. They gave
@@ -78,6 +83,9 @@ descriptions in MOTION.md and existing screenshots can describe superseded UI.
 | `project_browser.py`, `GridCards` | Bento cards: hovered card widens while row-mates yield (`card_rects`), swells, lifts and glows in its hue; artwork floats and turns toward the pointer; card hues drift and a diagonal colour wave crosses the grid. Each card is a cached body layer (~5 fps), live artwork, and a cached label strip. FLIP reflow on search; entrance spins artwork in from edge-on. |
 | `project_browser.py`, `themed_artwork` | Projects without their own `_TOOLS/icon` art (or with the template's copy) get artwork chosen by words in the folder name, else a stable generic pick. Custom art always wins. |
 | `project_browser.py`, `ActivityList` | Activity as a timeline of glass rows with event artwork; shares row motion with the file list. |
+| `project_metadata.py`, `STAGES` / `inferred_stage` | The template's shot stages (Modelling, Rigging, Layout, Animation, FX, Lighting, Compositing, Others) inferred from `SHOTS/<shot>/PROJECTS/<STAGE>`; Unassigned for loose saves in `PROJECTS`. The `other` key is kept for existing labels. |
+| `ui.py`, `update_browser` / `filter_files` | An "All stages" card leads the stage grid; it lists every stage's working files newest first, each row prefixed by its stage folder (`FileDelegate`, `folder`/`stage_title`). Stage cards show the template description on hover. |
+| `project_browser.py`, `GridCards.fit_rows` | The stage grid shrinks its rows (floor 188 px) so every stage is visible; the project grid keeps 264 px rows and scrolls. |
 | `ui.py`, `project_scene` / `projects_scene` / `projects_title` | The Projects page takes the library, project-artwork or stage scene and title for its current level. |
 | `motion.py`, `MotionButton.hop` / `OrbButton` | Selected nav icons turn a full revolution in 3D; the orb breathes and its iridescent rim slowly rotates. |
 
@@ -129,6 +137,74 @@ Displacement is positive downward; A is the item's amplitude.
   hue taken from the current scene and lifted to near white, screen-blended.
 - Background and tiles: an impulse into a critically damped spring gives a
   swell that peaks in about 0.25 s and ebbs over about 1.5 s.
+- Panels ride the wave (added 2026-10-13 at the user's request: "panels also
+  move dynamically", then "even more dynamic"). `physics.ripple` is an impulse
+  into an under-damped spring (0.7 s, 0.34), normalised to an outward peak of
+  1 at ~145 ms, a rebound of -0.32 at ~515 ms and a second swing of +0.10 at
+  ~890 ms, settled by `RIPPLE_MS` (~1.8 s). `RIPPLE_SPEED` is its launch speed.
+  Each panel starts when the front reaches its centre and is pushed away from
+  the orb; nearer panels push harder (strength 1 down to 0.7 across the wave).
+  - Cards (`GridCards.ripple_for`):
+    - Push and lift: 22 px push plus 8 px lift, 5.5% shape swell, and up to 7% stretch along the travel while moving fast.
+    - Light: hover-strength shadow and hue glow while lifted, and a sheen that crosses the glass with the front.
+    - Layering and bounds: lifted cards paint above their neighbours. Each axis's travel is limited by the room to the widget edge, so cards are never cropped.
+    - Artwork jumps 24 px, 95 ms after the card is struck, and is kept below the grid's top edge.
+  - Rows (`row_ripple`): 10 px push (9 px for activity) plus 4 px lift, with
+    brighter glass and edge, limited to the viewport so rows never crop.
+  - Every other block on the page and the page title (`motion.RippleLayer`):
+    when the front reaches a block, its snapshot is drawn on a layer over the
+    whole workspace, pushed 10 px plus a 3 px lift. Moving widgets in place
+    cropped them at their container's edge, so the user saw the Back button,
+    search and filter fields clipped. The block itself is hidden
+    (`HiddenEffect`) but stays in place and interactive; hit targets never
+    move. Ghosts are clipped only by a scroll viewport they belong to, and
+    the shockwave light stays above them. A block that is mid-reveal or
+    inside a transition is left alone. Everything is restored when its ripple
+    ends or a new refresh starts.
+- Footer while work runs: `choreo.StatusLine` is one quiet line (12 px, about
+  60% white) that elides in the middle, with the full text as its tooltip;
+  scan progress reads "12,480 files found · SH010". `choreo.Hairline` replaces
+  the progress bar: a 2 px scene-tinted comet gliding along a faint track,
+  fading in and out on a spring and pausing when minimised. Cancel is a quiet
+  text action (`quietAction`).
+- Sound (see [SOUND.md](SOUND.md)):
+  - At t=0, `refresh` plays a soft thump with the core flash and an air ring that widens in stereo with the wave.
+  - Each artwork plucks (`wave-0…6`) at its wave delay + 95 ms (the launch), pitched and panned by its x position, at most 8 plucks, fading.
+  - `done` resolves when the task ends, never before 1.1 s.
+  - If animation timing changes, keep `sound.LAUNCH_MS` and `MainWindow.wave_arrivals` in step.
+
+## Scrolling (lists and Settings)
+
+Added 2026-10-14 after the user reported that long file lists "jump"; they
+asked for smooth, premium scrolling with no harsh jumps or snaps. Qt's default
+wheel scrolling moved a 90 px-row list 270 px per notch, instantly.
+
+- `FileList` (files and activity) scrolls on a spring:
+  - Wheel: each notch glides 120 px on GLIDE; quick notches (under 160 ms apart,
+    same direction) gather speed up to 2.6x, and a glide in flight is
+    retargeted, never restarted. Fine-grained wheels and touchpads follow on
+    (0.24, 1.0).
+  - Ends: the list runs up to 120 px past an end, shown through `cards.rubber`
+    as growing resistance. 90 ms after the wheel stops, it springs home on
+    (0.42, 0.86), a soft landing.
+  - While gliding, rows trail behind the motion in proportion to their distance
+    from the pointer (up to 14 px), and row artwork tips (up to 10°) and lags
+    (5 px) with the speed. Glyphs only translate.
+  - Keyboard and programmatic reveals (`scrollTo`) glide too. Trips longer than
+    3.5 screens (End, Home) dissolve the current rows away in the direction of
+    travel (`warp_ghost`), land 2.5 screens short and glide in at speed while
+    the arriving rows fade up. They never streak past thousands of rows.
+  - A thin overlay thumb fades in while moving (squashing at the ends) and
+    fades out 0.7 s after rest. Rows dissolve into the backdrop at the top and
+    bottom edges where the list continues.
+  - When a rescan updates the same view (same order, at least 60% of rows
+    kept), the list keeps its place: the top row stays put. A different view
+    (filter, stage, sort) starts at its first row.
+  - Hover follows rows passing under a resting pointer; hover sounds stay quiet
+    while the list moves fast. Uniform row sizes keep thousands of rows cheap.
+- `motion.SmoothWheel` gives any other scroll area (the Settings page) the same
+  glide, without elastic ends.
+- Reduced motion uses Qt's normal scrolling.
 
 ## How another agent should revise it
 

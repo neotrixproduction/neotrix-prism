@@ -271,8 +271,10 @@ def test_named_version_stage_navigation_and_multiselect(window):
     assert window.browse_step=='versions'
     assert {e['name'] for e in window.choice_cards.entries}=={'General','Vertical'}
     window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['name']=='Vertical'))
+    assert window.browse_step=='areas'
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='3d'))
     assert window.browse_step=='stages'
-    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='unassigned'))
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='other'))
     assert window.file_cards.rowCount()==1
     assert window.display_files[0]['name']=='NTX_Vertical_0010_v001.blend'
     old=window.stage_document['fingerprint']
@@ -297,6 +299,8 @@ def test_template_stages_and_all_stages_view(window):
     window.open_project(str(project));wait()
     window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='work'))
     window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['name']=='Vertical'))
+    assert window.browse_step=='areas'
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='3d'))
     paths=[e['path'] for e in window.choice_cards.entries]
     # ALL leads; every template stage is offered; empty Unassigned stays hidden.
     assert paths==['all','modelling','rigging','layout','animation','fx','lighting','compositing','other']
@@ -437,6 +441,7 @@ def test_project_sections_assets_preview_and_back(window):
     window.browse_back();window.browse_back();window.choice_selected(1)
     assert {e['name'] for e in window.choice_cards.entries}=={'General','Vertical'}
     window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['name']=='General'))
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='3d'))
     window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='modelling'))
     assert [f['name'] for f in window.display_files]==['Shared_v001.blend']
     window.breadcrumb_clicked('sections')
@@ -453,7 +458,8 @@ def test_sections_without_named_versions_preserve_legacy_work(window):
     window.open_project(str(project));wait()
     assert [e['name'] for e in window.choice_cards.entries]==['Assets','Working files','Preview']
     window.choice_selected(1)
-    assert window.browse_step=='stages'
+    assert window.browse_step=='areas'
+    assert {'3D','Graphic Design','Motion Graphic','AI Generation','Other work'} <= {e['name'] for e in window.choice_cards.entries}
     window.browse_back()
     assert window.browse_step=='sections'
     window.choice_selected(0)
@@ -461,6 +467,58 @@ def test_sections_without_named_versions_preserve_legacy_work(window):
     window.breadcrumb_clicked('sections')
     window.choice_selected(2)
     assert not window.display_files
+    assert not messages
+
+
+def test_work_areas_ai_files_and_reveal_action(window,monkeypatch):
+    from neotrix_prism import apps
+    from neotrix_prism.motion import MotionButton
+    window,project,messages,wait=window
+    for path in ('03_PRODUCTION/WORK/AI_GENERATION/workflows/prompt.txt',
+                 '03_PRODUCTION/WORK/AI_GENERATION/workflows/comfy.json',
+                 '03_PRODUCTION/WORK/AI_GENERATION/inputs/reference.webp',
+                 '03_PRODUCTION/WORK/AI_GENERATION/outputs/result.png',
+                 '03_PRODUCTION/WORK/AI_GENERATION/handoff_archives/delivery.zip',
+                 '03_PRODUCTION/WORK/GRAPHIC_DESIGN/projects/design.ai',
+                 '03_PRODUCTION/WORK/MOTION_GRAPHICS/projects/motion.aep'):
+        file=project/path;file.parent.mkdir(parents=True,exist_ok=True);file.write_bytes(b'fixture')
+    window.open_project(str(project));wait()
+    window.choice_selected(1)
+    assert window.browse_step=='areas'
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='ai_generation'))
+    assert window.browse_step=='files' and len(window.display_files)==5
+    window.ai_filter.setCurrentIndex(window.ai_filter.findData('workflows'))
+    assert {f['name'] for f in window.display_files}=={'prompt.txt','comfy.json'}
+    window.file_cards.selectRow(0)
+    calls=[];monkeypatch.setattr(apps,'reveal',lambda path:calls.append(path))
+    window.file_actions[2].click()
+    assert calls==[window.selected()['path']]
+    assert 'Reveal in Explorer' not in {a.text() for a in window.more_actions.menu().actions()}
+    assert not any(b.text()=='Save version' for b in window.details_panel.findChildren(MotionButton))
+    window.browse_back()
+    assert window.browse_step=='areas'
+    window.choice_selected(next(i for i,e in enumerate(window.choice_cards.entries) if e['path']=='graphic_design'))
+    assert {f['name'] for f in window.display_files}=={'design.ai'}
+    assert not messages
+
+
+def test_update_notification_and_deferred_install(window,monkeypatch,tmp_path):
+    from neotrix_prism import updater
+    window,project,messages,wait=window
+    monkeypatch.setattr(updater,'latest_release',lambda current:{'tag':'v0.7.0-preview','version':'0.7.0','notes':'Test release'})
+    panel=window.updates
+    panel.check_now(automatic=True)
+    panel.task.wait(5000);QTest.qWait(30)
+    assert 'v0.7.0-preview' in window.status.text()
+    assert not panel.install.isEnabled()  # protect this development checkout
+    payload=tmp_path/'payload';payload.mkdir()
+    panel.ready({'root':str(panel.root),'payload':str(payload),'stage':str(tmp_path),'version':'0.7.0'})
+    calls=[]
+    monkeypatch.setattr(updater,'apply_on_exit',lambda prepared,restart:calls.append(restart))
+    panel.apply(False)
+    assert calls==[] and panel.queued
+    assert panel.can_close()
+    assert calls==[False] and not panel.queued
     assert not messages
 
 

@@ -6,15 +6,15 @@ import os
 import re
 import tempfile
 from pathlib import Path
-from PySide6.QtCore import Qt, QObject, Signal, QRunnable, QThreadPool, QRectF, QSize, QItemSelectionModel, QPoint, QPointF, QLineF
-from PySide6.QtGui import QPainter, QColor, QPen, QImageReader, QPixmap, QFontMetrics, QIcon, QLinearGradient, QRadialGradient, QPainterPath, QFont
+from PySide6.QtCore import Qt, QObject, Signal, QRunnable, QThreadPool, QRectF, QSize, QItemSelectionModel, QPoint, QPointF, QLineF, QTimer
+from PySide6.QtGui import QPainter, QColor, QPen, QImageReader, QPixmap, QFontMetrics, QIcon, QLinearGradient, QRadialGradient, QPainterPath, QFont, QCursor
 from PySide6.QtWidgets import QListWidget, QListWidgetItem, QStyledItemDelegate, QAbstractItemView, QStyle
 from . import art3d, physics
 from .ambient import ambient_time
-from .cards import CardSurface
+from .cards import CardSurface, rubber
 from .design import icon
-from .motion import clock, enabled, refresh_motion, snap, spring
-from .physics import POP, SNAPPY
+from .motion import clock, enabled, refresh_motion, snap, snapshot, spring
+from .physics import GLIDE, POP, SNAPPY
 from .storage import user_dir
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -219,8 +219,17 @@ class GridCards(CardSurface):
                 x+=width+20
         return rects
 
+    RIPPLE_PUSH = 22.0   # px a card travels away from the orb at the ripple's peak
+    RIPPLE_LIFT = 8.0    # px it rises as it is pushed
+    RIPPLE_SWELL = .055  # shape growth at the peak (labels only translate)
+    RIPPLE_STRETCH = .07  # shape stretch along the push at full speed
+
     def refresh_wave(self, delay=0, origin=None, speed=1650.0):
-        """Bounce visible artwork; with an origin, each card jumps as the wave front reaches it."""
+        """Ride the refresh wave: as the front reaches each card, the card is
+        pushed away from the orb, lifts and catches a sheen of light, then its
+        artwork jumps off it; with no origin the cards ripple in order."""
+        self.refresh_origin=QPointF(origin) if origin is not None else None
+        self.refresh_speed=speed
         lags={}
         rects=self.card_rects()
         for n,i in enumerate(sorted(rects)):
@@ -230,10 +239,63 @@ class GridCards(CardSurface):
             reach=QLineF(QPointF(origin),rect.center()).length()/speed*1000 if origin is not None else min(n*65,650)
             lags[self.entries[i].get('path')]=delay+reach
         self.refresh_lags=lags
+        self.refresh_span=(min(lags.values(),default=0),max(lags.values(),default=0))
         def step(value):
             self.refresh_elapsed = float(value)
             self.update()
-        clock(self,'_refresh_cards',physics.BOUNCE_MS+max(lags.values(),default=0),step,self.reset_wave)
+        clock(self,'_refresh_cards',max(physics.BOUNCE_MS,physics.RIPPLE_MS)+max(lags.values(),default=0),step,self.reset_wave)
+
+    def ripple_level(self,index):
+        """How lifted a card is by the refresh ripple right now (for paint order)."""
+        lag=self.refresh_lags.get(self.entries[index].get('path')) if 0<=index<len(self.entries) else None
+        if lag is None or self.refresh_elapsed<0 or not enabled(self):
+            return 0.0
+        return max(0.0,physics.ripple(self.refresh_elapsed-lag)[0])
+
+    def ripple_for(self,rect,lag):
+        """(offset, lift 0..1, sheen, stretch) for a card the refresh wave is crossing.
+
+        The push points away from the orb and weakens with distance; the card
+        stretches along its travel while it moves fast. Cards near the widget's
+        edge travel less along that axis, so nothing is ever cropped. The sheen
+        is (direction, band position 0..1 from the near edge, strength) while
+        the front is inside the card, else None."""
+        if lag is None or self.refresh_elapsed<0:
+            return QPointF(),0.0,None,(1.0,1.0)
+        local=self.refresh_elapsed-lag
+        amount,speed=physics.ripple(local)
+        origin=getattr(self,'refresh_origin',None)
+        if origin is None:
+            direction=QPointF(0.0,-1.0)
+        else:
+            delta=rect.center()-origin
+            length=math.hypot(delta.x(),delta.y()) or 1.0
+            direction=QPointF(delta.x()/length,delta.y()/length)
+        first,last=getattr(self,'refresh_span',(lag,lag))
+        strength=1-.3*((lag-first)/(last-first) if last>first else 0.0)
+        lift=max(0.0,amount)*strength
+        # Outward peak of the push, then how much of it fits before the edge.
+        px,py=self.RIPPLE_PUSH*direction.x()*strength,self.RIPPLE_PUSH*direction.y()*strength
+        rise=self.RIPPLE_LIFT*strength
+        peak_x,peak_y=px,py-rise
+        grow_x,grow_y=rect.width()*self.RIPPLE_SWELL/2+2,rect.height()*self.RIPPLE_SWELL/2+2
+        def fit(peak,low,high,low_visible,high_visible):
+            if peak<-.5 and low_visible:
+                return min(1.0,max(0.0,low)/-peak)
+            if peak>.5 and high_visible:
+                return min(1.0,max(0.0,high)/peak)
+            return 1.0
+        kx=fit(peak_x,rect.left()-grow_x-3,self.width()-3-rect.right()-grow_x,rect.left()>=0,rect.right()<=self.width())
+        ky=fit(peak_y,rect.top()-grow_y-3,self.height()-3-rect.bottom()-grow_y,rect.top()>=0,rect.bottom()<=self.height())
+        offset=QPointF(px*amount*kx,(py*amount-rise*max(0.0,amount))*ky)
+        fast=min(1.0,abs(speed)/physics.RIPPLE_SPEED)*self.RIPPLE_STRETCH*strength
+        stretch=(1+fast*abs(direction.x())-.5*fast*abs(direction.y()),1+fast*abs(direction.y())-.5*fast*abs(direction.x()))
+        # The front (refresh_speed px/s) crosses the card: a band of light rides with it.
+        extent=abs(direction.x())*rect.width()/2+abs(direction.y())*rect.height()/2
+        crossing=max(1.0,2*extent/getattr(self,'refresh_speed',1650.0)*1000)
+        position=(local+crossing/2)/crossing
+        sheen=(direction,position,strength) if -.35<position<1.35 else None
+        return offset,lift,sheen,stretch
 
     def reset_wave(self):
         if getattr(self, '_refresh_cards', None):self._refresh_cards.stop()
@@ -390,7 +452,7 @@ class GridCards(CardSurface):
         slots=self.layout_slots()
         rects=self.card_rects()
         # The most lifted card paints last so its artwork can rise over the gutter.
-        for i in sorted(rects,key=lambda i:(self.hover_level(i),i)):
+        for i in sorted(rects,key=lambda i:(max(self.hover_level(i),self.ripple_level(i)),i)):
             rect=rects[i]
             row,col,span=slots[i]
             path=self.entries[i].get('path')
@@ -441,8 +503,10 @@ class GridCards(CardSurface):
         entry=self.entries[index]
         moving=enabled(self)
         rise,reveal,art_in,title_in,title_alpha=entrance
-        bob,stretch,wobble=refresh_motion(self.refresh_elapsed,self.refresh_lags.get(entry.get('path')),18) if moving else (0.0,1.0,0.0)
-        glow_motion=max(0,-bob/18)
+        lag=self.refresh_lags.get(entry.get('path'))
+        bob,stretch,wobble=refresh_motion(self.refresh_elapsed,lag,24) if moving else (0.0,1.0,0.0)
+        push,lift,sheen,(sx,sy)=self.ripple_for(rect,lag) if moving else (QPointF(),0.0,None,(1.0,1.0))
+        glow_motion=max(0,-bob/24)
         focused=self.hasFocus() and index==self.selected_index
         if moving:
             hover=max(self.hover_level(index),1.0 if focused else 0.0)
@@ -459,18 +523,21 @@ class GridCards(CardSurface):
         # Size: the card swells as it lifts and sinks when pressed; on entrance it
         # grows in from 90%. Only the shape scales; labels are re-anchored.
         swell=6*hover-3*press
-        grow=.9+.1*rise
-        width,height=rect.width()*grow-2*press,(rect.height()+2*swell)*grow
-        centre=rect.center()
+        grow=(.9+.1*rise)*(1+self.RIPPLE_SWELL*lift)
+        width,height=(rect.width()*grow-2*press)*sx,(rect.height()+2*swell)*grow*sy
+        centre=rect.center()+push
         rect=QRectF(snap(centre.x()-width/2,dpr),snap(centre.y()-height/2-4*hover+40*(1-rise),dpr),width,height)
+        # A lifted card casts the deeper shadow and hue glow of a hovered one.
+        lit=max(level,.7*lift)
         # Living colour: each card drifts in hue and gradient angle, and a slow
         # diagonal wave of light and colour crosses the whole grid.
         diagonal=(rect.center().x()+rect.center().y()+self.offset)/max(1.0,self.width()+self.height())
         front=(t*.085)%1.9-.45
         wave=math.exp(-((diagonal-front)/.12)**2) if moving else 0.0
         drift=round(t*5+index*.23)/5  # body colours drift at 5 fps, staggered per card
+        band=(round(sheen[0].x()*8),round(sheen[0].y()*8),round(sheen[1]*28),round(sheen[2]*8)) if sheen else None
         state=(round(rect.width()*dpr),round(rect.height()*dpr),top.rgb(),bottom.rgb(),drift,
-               round(level*30),round(glow_motion*30),round(wave*30),round(tilt[0]*10),round(tilt[1]*10))
+               round(lit*30),round(glow_motion*30),round(wave*30),round(tilt[0]*10),round(tilt[1]*10),band)
         path=entry.get('path')
         cached=self.faces.get(path)
         if cached is None or cached[0]!=state:
@@ -478,7 +545,7 @@ class GridCards(CardSurface):
             body=QPixmap(max(1,round((rect.width()+2*pad)*dpr)),max(1,round((rect.height()+2*pad)*dpr)))
             body.setDevicePixelRatio(dpr);body.fill(Qt.transparent)
             q=QPainter(body);q.setRenderHints(QPainter.Antialiasing|QPainter.SmoothPixmapTransform)
-            self.paint_body(q,QRectF(pad,pad,rect.width(),rect.height()),index,top,bottom,drift,phase,level,tilt,glow_motion,wave,front,diagonal)
+            self.paint_body(q,QRectF(pad,pad,rect.width(),rect.height()),index,top,bottom,drift,phase,lit,tilt,glow_motion,wave,front,diagonal,sheen)
             q.end()
             cached=(state,body)
             self.faces[path]=cached
@@ -491,7 +558,7 @@ class GridCards(CardSurface):
         if focused:
             p.setPen(QPen(QColor('#f3e6ff'),1,Qt.DotLine));p.setBrush(Qt.NoBrush);p.drawRoundedRect(rect.adjusted(4,4,-4,-4),18,18)
 
-    def paint_body(self,p,rect,index,top,bottom,t,phase,level,tilt,glow_motion,wave,front,diagonal):
+    def paint_body(self,p,rect,index,top,bottom,t,phase,level,tilt,glow_motion,wave,front,diagonal,sheen=None):
         shift=.03*math.sin(t*.33+phase)+.07*wave+.09*glow_motion
         light=.1*wave+.14*glow_motion+.07*level
         def tone(colour,extra_shift=0.0,extra_light=0.0):
@@ -531,6 +598,16 @@ class GridCards(CardSurface):
             for stop,alpha in ((local-.25,0),(local,int(46*wave)),(local+.25,0)):
                 band.setColorAt(max(0.0,min(1.0,stop)),QColor(255,248,255,alpha))
             p.fillPath(shape,band)
+        if sheen is not None:
+            # Light passing through the glass with the wave front, in the
+            # direction the wave travels; strongest close to the orb.
+            direction,position,strength=sheen
+            extent=abs(direction.x())*rect.width()/2+abs(direction.y())*rect.height()/2
+            start,end=rect.center()-direction*extent,rect.center()+direction*extent
+            light_band=QLinearGradient(start,end)
+            for stop,alpha in ((position-.24,0),(position-.07,46),(position,96),(position+.05,52),(position+.2,0)):
+                light_band.setColorAt(max(0.0,min(1.0,stop)),QColor(255,247,255,int(alpha*strength)))
+            p.fillPath(shape,light_band)
         if level>.01:
             spot=QRadialGradient(rect.center().x()+tilt[0]*rect.width()*.45,rect.center().y()+tilt[1]*rect.height()*.45,rect.width()*.55)
             spot.setColorAt(0,QColor(255,245,255,int(50*level)));spot.setColorAt(1,QColor(255,245,255,0))
@@ -560,9 +637,14 @@ class GridCards(CardSurface):
             yaw=pitch=roll=lift=0.0
             scale=1.0
         centre=QPointF(rect.center().x()+tilt[0]*10*level,rect.top()+24+size/2)
+        # Keep the artwork inside its card's reach and, for a top-row card, below
+        # the grid's top edge however high the refresh throws it.
+        floor=-(24+size*.06)
+        if rect.top()>-size:
+            floor=max(floor,-(rect.top()+24-size*(scale*1.15-1)/2-3))
         art3d.paint(p,artwork,centre,size,yaw=yaw,pitch=pitch,roll=roll,scale=scale,stretch=stretch,
                     opacity=opacity*reveal*max(0.0,min(1.0,art_in*2.2)),depth=size*.05*level if level>.05 else 0.0,
-                    gloss=level,shadow=1.0,lift=max(lift,-(24+size*.06)))
+                    gloss=level,shadow=1.0,lift=max(lift,floor))
 
     def label_strip(self,index,entry,rect,title_in,title_alpha,hover,level,press,dpr):
         """Title and hover details, rendered once per change at device resolution."""
@@ -641,42 +723,71 @@ def row_motion(owner,option,key,amplitude=8):
         hover=owner.hover_levels.get(key,0.0)
         chosen=owner.select_levels.get(key,1.0 if selected else 0.0)
         rise,reveal,art_in=owner.entrance(key)
+        reveal*=1-.9*getattr(owner,'warp',0.0)  # arriving rows fade up after a long trip
         bob,stretch,wobble=refresh_motion(owner.refresh_elapsed,owner.refresh_lags.get(key),amplitude)
         return hover,chosen,rise,reveal,art_in,bob,stretch,wobble
     hover=1.0 if option.state & QStyle.State_MouseOver else 0.0
     return hover,1.0 if selected else 0.0,1.0,1.0,1.0,0.0,1.0,0.0
 
 
-def paint_row(p,owner,option,hover,chosen,rise,reveal):
+def row_ripple(owner,option,key,push=10.0):
+    """(offset, lift 0..1) of a row the refresh wave is crossing: pushed away
+    from the orb, lifted, then one rebound (the row only translates)."""
+    lag=owner.refresh_lags.get(key)
+    if lag is None or owner.refresh_elapsed<0 or not enabled(owner):
+        return QPointF(),0.0
+    amount,_=physics.ripple(owner.refresh_elapsed-lag)
+    origin=getattr(owner,'refresh_origin',None)
+    if origin is None:
+        direction=QPointF(0.0,-1.0)
+    else:
+        delta=QPointF(owner.viewport().mapTo(owner,option.rect.center()))-origin
+        length=math.hypot(delta.x(),delta.y()) or 1.0
+        direction=QPointF(delta.x()/length,delta.y()/length)
+    lift=max(0.0,amount)
+    # Rows near the viewport's edge travel less along that axis, so they are never cropped.
+    rect,view=QRectF(option.rect).adjusted(4,4,-4,-4),owner.viewport().rect()
+    peak_x,peak_y=push*direction.x(),push*direction.y()-4
+    kx=min(1.0,max(0.0,(rect.left()-1) if peak_x<0 else (view.width()-1-rect.right()))/abs(peak_x)) if abs(peak_x)>.5 else 1.0
+    ky=min(1.0,max(0.0,(rect.top()-1) if peak_y<0 else (view.height()-1-rect.bottom()))/abs(peak_y)) if abs(peak_y)>.5 and rect.top()>=0 and rect.bottom()<=view.height() else 1.0
+    return QPointF(push*amount*direction.x()*kx,(push*amount*direction.y()-4*lift)*ky),lift
+
+
+def paint_row(p,owner,option,hover,chosen,rise,reveal,ripple=(QPointF(),0.0)):
     """Scene-tinted glass row; returns its rect. Labels stay pixel-aligned."""
     level,chosen=max(0.0,min(1.0,hover)),max(0.0,min(1.0,chosen))
     dpr=owner.devicePixelRatioF()
+    offset,lift=ripple
+    flow=owner.scroll_offset(option.rect) if hasattr(owner,'scroll_offset') else 0.0
     rect=QRectF(option.rect).adjusted(4,4,-4,-4)
-    rect.moveTop(snap(rect.top()+22*(1-rise),dpr))
+    rect.moveTopLeft(QPointF(snap(rect.left()+offset.x(),dpr),snap(rect.top()+22*(1-rise)+offset.y()+flow,dpr)))
     p.setOpacity(reveal)
     surface=getattr(owner.window(),'surface',None)
     tint=surface.scene_colors()[1].lighter(420) if surface and hasattr(surface,'scene_colors') else QColor('#c9c3ff')
     p.setPen(Qt.NoPen)
-    p.setBrush(QColor(255,255,255,int(15+13*level+18*chosen)))
+    p.setBrush(QColor(255,255,255,int(15+13*level+18*chosen+20*lift)))
     p.drawRoundedRect(rect,15,15)
     if chosen>.01:
         tint.setAlpha(int(58*chosen))
         p.setBrush(tint)
         p.drawRoundedRect(rect,15,15)
     p.setBrush(Qt.NoBrush)
-    p.setPen(QPen(QColor(255,255,255,int(24+26*level+80*chosen)),1))
+    p.setPen(QPen(QColor(255,255,255,int(min(255,24+26*level+80*chosen+90*lift))),1))
     p.drawRoundedRect(rect,15,15)
     return rect
 
 
-def paint_row_art(p,owner,art,centre,size,hover,reveal,art_in,bob,stretch,wobble,t=0.0,phase=0.0):
-    """Row artwork in perspective: it turns toward the viewer and lifts on hover."""
+def paint_row_art(p,owner,art,centre,size,hover,reveal,art_in,bob,stretch,wobble,t=0.0,phase=0.0,swim=0.0):
+    """Row artwork in perspective: it turns toward the viewer and lifts on hover;
+    while the list glides it tips into the motion and trails a little behind."""
     moving=enabled(owner)
+    tip=max(-10.0,min(10.0,-swim*.004)) if moving else 0.0
+    trail=max(-5.0,min(5.0,swim*.0016)) if moving else 0.0
     art3d.paint(p,art,QPointF(centre.x(),centre.y()),size,
                 yaw=(-22*hover+60*(1-art_in)+wobble*2+5*math.sin(t*.5+phase)*(1-hover)) if moving else 0.0,
-                pitch=(8*hover) if moving else 0.0,roll=wobble*.6 if moving else 0.0,
+                pitch=(8*hover+tip) if moving else 0.0,roll=wobble*.6 if moving else 0.0,
                 scale=(.6+.4*art_in)*(1+.08*hover),stretch=stretch,
-                opacity=reveal*max(0.0,min(1.0,art_in*2)),lift=bob-3*hover,
+                opacity=reveal*max(0.0,min(1.0,art_in*2)),lift=bob-3*hover+trail,
                 depth=size*.05*hover if hover>.05 else 0.0,gloss=hover*.7)
 
 
@@ -690,9 +801,11 @@ class FileDelegate(QStyledItemDelegate):
         owner=self.parent()
         hover,chosen,rise,reveal,art_in,bob,stretch,wobble=row_motion(owner,option,file['path'])
         p.save();p.setRenderHints(QPainter.Antialiasing|QPainter.TextAntialiasing|QPainter.SmoothPixmapTransform)
-        rect=paint_row(p,owner,option,hover,chosen,rise,reveal)
-        art=icon(file['application'],128).pixmap(128,128)
-        paint_row_art(p,owner,art,QPointF(rect.left()+42,rect.top()+40),60,hover,reveal,art_in,bob,stretch,wobble)
+        rect=paint_row(p,owner,option,hover,chosen,rise,reveal,row_ripple(owner,option,file['path']))
+        art=owner.app_art.get(file['application'])
+        if art is None:
+            art=owner.app_art[file['application']]=icon(file['application'],128).pixmap(128,128)
+        paint_row_art(p,owner,art,QPointF(rect.left()+42,rect.top()+40),60,hover,reveal,art_in,bob,stretch,wobble,swim=owner.scroll_speed())
         p.setOpacity(reveal)
         text=rect.adjusted(88,14,-16,-10)
         font=option.font;font.setPixelSize(14);font.setBold(True);p.setFont(font)
@@ -708,7 +821,13 @@ class FileDelegate(QStyledItemDelegate):
         if folder:
             text=rect.adjusted(88,14,-16,-10)
         font.setPixelSize(12);font.setBold(False);p.setFont(font);p.setPen(QColor('#e8e1f2'))
-        subtitle=(f"{file['stage_title']}  ·  " if file.get('stage_title') else '')+f"{file['application']}  ·  {file['shot']}  ·  {file['version']}  ·  "+time.strftime('%d %b %Y',time.localtime(file['modified']))
+        ai = file.get('department')=='AI Generation'
+        if ai:
+            from .indexer import ai_collection, AI_COLLECTIONS
+            detail = AI_COLLECTIONS.get(ai_collection(file),'Other AI files')
+        else:
+            detail = file['shot']
+        subtitle=(f"{file['stage_title']}  ·  " if file.get('stage_title') else '')+f"{file['application']}  ·  {detail}  ·  {file['version']}  ·  "+time.strftime('%d %b %Y',time.localtime(file['modified']))
         p.drawText(text.adjusted(0,28,0,0),Qt.AlignTop,QFontMetrics(font).elidedText(subtitle,Qt.ElideRight,int(text.width())))
         if option.state & QStyle.State_HasFocus:
             p.setBrush(Qt.NoBrush);p.setPen(QPen(QColor('#fffaff'),1,Qt.DotLine));p.drawRoundedRect(rect.adjusted(3,3,-3,-3),12,12)
@@ -726,9 +845,9 @@ class ActivityDelegate(QStyledItemDelegate):
         owner=self.parent()
         hover,chosen,rise,reveal,art_in,bob,stretch,wobble=row_motion(owner,option,entry['path'],7)
         p.save();p.setRenderHints(QPainter.Antialiasing|QPainter.TextAntialiasing|QPainter.SmoothPixmapTransform)
-        rect=paint_row(p,owner,option,hover,chosen,rise,reveal)
+        rect=paint_row(p,owner,option,hover,chosen,rise,reveal,row_ripple(owner,option,entry['path'],9.0))
         paint_row_art(p,owner,owner.pixmap(entry.get('artwork')),QPointF(rect.left()+38,rect.center().y()),50,
-                      hover,reveal,art_in,bob,stretch,wobble,ambient_time(owner),index.row()*.9)
+                      hover,reveal,art_in,bob,stretch,wobble,ambient_time(owner),index.row()*.9,owner.scroll_speed())
         p.setOpacity(reveal)
         font=option.font;font.setPixelSize(12);font.setBold(False);p.setFont(font)
         metrics=QFontMetrics(font)
@@ -749,6 +868,7 @@ class ActivityDelegate(QStyledItemDelegate):
 class FileList(QListWidget):
     selection_changed=Signal()
     activated=Signal(int)
+    hovered=Signal(int)  # pointer arrived on a row; drives hover sound
 
     def __init__(self):
         super().__init__()
@@ -771,6 +891,180 @@ class FileList(QListWidget):
         self.chosen = set()
         self.empty_art = None
         self.pixmaps = {}
+        self.app_art = {}
+        self.faces = {}
+        # Every row has the same height, so thousands of rows lay out at once.
+        self.setUniformItemSizes(True)
+        # Spring scrolling state: a float position that may run past either end
+        # (shown as an elastic edge), the overlay thumb's presence, wheel rhythm.
+        self.scroll_pos = self.scroll_target = 0.0
+        self.overscroll = 0.0
+        self.scroll_anchor = None
+        self.applying = False
+        self.wheel_at, self.wheel_sign, self.wheel_streak = 0.0, 0, 0
+        self.thumb = 0.0
+        self.warp, self.warp_ghost, self.warp_sign = 0.0, None, 1
+        self.edge_timer = QTimer(self)
+        self.edge_timer.setSingleShot(True)
+        self.edge_timer.timeout.connect(self.settle_edges)
+        self.thumb_timer = QTimer(self)
+        self.thumb_timer.setSingleShot(True)
+        self.thumb_timer.timeout.connect(lambda: self.show_thumb(False))
+        bar = self.verticalScrollBar()
+        bar.valueChanged.connect(self.sync_scroll)
+        bar.rangeChanged.connect(self.range_changed)
+
+    # ------------------------------------------------------------ smooth scrolling
+    STEP = 120.0  # px per wheel notch before quick notches gather speed
+
+    def scroll_limit(self):
+        return float(self.verticalScrollBar().maximum())
+
+    def wheelEvent(self, event):
+        """Spring scrolling: every notch glides instead of jumping, quick notches
+        gather speed, and past either end the list gives a little before it
+        eases home. A glide in flight is retargeted, never restarted."""
+        delta = event.angleDelta().y()
+        if not enabled(self) or not delta or event.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier):
+            return super().wheelEvent(event)
+        now = time.monotonic()
+        sign = 1 if delta < 0 else -1  # +1 travels down the list
+        notch = abs(delta) >= 120
+        if notch:
+            quick = now-self.wheel_at < .16 and sign == self.wheel_sign
+            self.wheel_streak = self.wheel_streak+1 if quick else 0
+            step = self.STEP*min(2.6, 1+.32*self.wheel_streak)*abs(delta)/120
+        else:
+            step = self.STEP*abs(delta)/120  # high-resolution wheels and touchpads
+        self.wheel_at, self.wheel_sign = now, sign
+        self.scroll_anchor = event.position().y()
+        low, high = 0.0, self.scroll_limit()
+        target = self.scroll_target+sign*step
+        if target < low:
+            target = low-min(120.0, low-target)
+        elif target > high:
+            target = high+min(120.0, target-high)
+        self.glide_to(target, GLIDE if notch else (.24, 1.0))
+        if target < low or target > high:
+            self.edge_timer.start(90)
+        event.accept()
+
+    def glide_to(self, target, feel=GLIDE, velocity=None):
+        target = float(target)
+        span = 2.5*max(200.0, self.viewport().height())
+        distance = target-self.scroll_pos
+        if abs(distance) > span*1.4 and self.isVisible():
+            # A long trip (End, Home, a far reveal): rather than streak past
+            # thousands of rows, the current rows dissolve away in the direction
+            # of travel while the list lands a short glide from the target and
+            # flies the last stretch in.
+            self.warp_ghost = snapshot(self.viewport())
+            self.warp_sign = 1 if distance > 0 else -1
+            physics.cancel(self, 'scroll')
+            self.apply_scroll(target-math.copysign(span, distance))
+            velocity = math.copysign(span*5, distance)
+            def fade(value):
+                self.warp = max(0.0, float(value))
+                self.viewport().update()
+            def faded():
+                self.warp_ghost = None
+            self.warp = 1.0
+            spring(self, 'warp', 0.0, fade, value=1.0, feel=(.3, 1.0), done=faded)
+        self.scroll_target = target
+        if self.scroll_limit() > 0:
+            self.show_thumb(True)
+        spring(self, 'scroll', self.scroll_target, self.apply_scroll, value=self.scroll_pos,
+               velocity=velocity, feel=feel, precision=.25, done=self.scroll_settled)
+
+    def apply_scroll(self, value):
+        self.scroll_pos = float(value)
+        low, high = 0.0, self.scroll_limit()
+        clamped = max(low, min(high, self.scroll_pos))
+        excess = self.scroll_pos-clamped
+        # Past an end the rows stretch with growing resistance (a rubber band).
+        self.overscroll = -math.copysign(rubber(abs(excess), max(1.0, self.viewport().height())), excess) if excess else 0.0
+        self.applying = True
+        self.verticalScrollBar().setValue(round(clamped))
+        self.applying = False
+        self.track_hover()
+        self.viewport().update()
+
+    def sync_scroll(self, value):
+        if self.applying:
+            return
+        # Something else moved the list (a drag selection, a cleared list):
+        # adopt its position and let go of any glide in flight.
+        physics.cancel(self, 'scroll')
+        self.scroll_pos = self.scroll_target = float(value)
+        self.overscroll = 0.0
+
+    def range_changed(self, low, high):
+        if physics.get(self, 'scroll') is None:
+            self.scroll_pos = self.scroll_target = float(max(low, min(high, self.verticalScrollBar().value())))
+            self.overscroll = 0.0
+        elif self.scroll_target > high and not self.edge_timer.isActive():
+            self.glide_to(float(high), GLIDE)
+
+    def settle_edges(self):
+        """The wheel has stopped past an end: spring home with a soft landing."""
+        low, high = 0.0, self.scroll_limit()
+        if self.scroll_target < low or self.scroll_target > high:
+            self.glide_to(max(low, min(high, self.scroll_target)), (.42, .86), physics.speed(self, 'scroll'))
+
+    def scroll_settled(self):
+        self.overscroll = 0.0
+        self.scroll_anchor = None
+        self.thumb_timer.start(700)
+        self.viewport().update()
+
+    def scroll_speed(self):
+        """Current glide speed in px/s (positive travels down the list)."""
+        return physics.speed(self, 'scroll') if enabled(self) else 0.0
+
+    def scroll_offset(self, rect):
+        """Paint offset of a row: the elastic edge, plus a gentle trail while the
+        list glides; rows further from the pointer follow a little behind."""
+        speed = self.scroll_speed()
+        height = max(1.0, self.viewport().height())
+        anchor = self.scroll_anchor if self.scroll_anchor is not None else height/2
+        trail = max(-14.0, min(14.0, speed*.0045*abs(rect.center().y()-anchor)/height)) if speed else 0.0
+        return self.overscroll+trail
+
+    def scrollTo(self, index, hint=QAbstractItemView.EnsureVisible):
+        """Keyboard moves and programmatic reveals glide too."""
+        if not enabled(self) or not self.isVisible() or not index.isValid():
+            return super().scrollTo(index, hint)
+        rect, view = self.visualRect(index), self.viewport().height()
+        value = self.verticalScrollBar().value()
+        if hint == QAbstractItemView.PositionAtTop:
+            target = value+rect.top()
+        elif hint == QAbstractItemView.PositionAtBottom:
+            target = value+rect.bottom()-view
+        elif hint == QAbstractItemView.PositionAtCenter:
+            target = value+rect.center().y()-view/2
+        elif rect.top() < 0:
+            target = value+rect.top()-6
+        elif rect.bottom() > view:
+            target = value+rect.bottom()-view+6
+        else:
+            return
+        self.scroll_anchor = None
+        self.glide_to(max(0.0, min(self.scroll_limit(), float(target))), GLIDE)
+
+    def show_thumb(self, visible):
+        if visible:
+            self.thumb_timer.stop()
+        def apply(value):
+            self.thumb = max(0.0, float(value))
+            self.viewport().update()
+        spring(self, 'thumb', 1.0 if visible else 0.0, apply, value=self.thumb, feel=SNAPPY if visible else (.5, 1.0))
+
+    def track_hover(self):
+        """Rows passing under a resting pointer light up as they arrive (quietly while fast)."""
+        view = self.viewport()
+        point = view.mapFromGlobal(QCursor.pos())
+        if view.rect().contains(point):
+            self.update_hover(point, sound=abs(self.scroll_speed()) < 350)
 
     def pixmap(self, path):
         """Cached artwork for a row (application or event artwork)."""
@@ -792,6 +1086,7 @@ class FileList(QListWidget):
         return found
 
     def refresh_wave(self, delay=0, origin=None, speed=1650.0):
+        self.refresh_origin=QPointF(origin) if origin is not None else None
         lags={}
         for n,item in enumerate(self.visible_items()):
             centre=QPointF(self.viewport().mapTo(self,self.visualItemRect(item).center()))
@@ -801,7 +1096,7 @@ class FileList(QListWidget):
         def step(value):
             self.refresh_elapsed=float(value)
             self.viewport().update()
-        clock(self,'_refresh_files',physics.BOUNCE_MS+max(lags.values(),default=0),step,self.reset_wave)
+        clock(self,'_refresh_files',max(physics.BOUNCE_MS,physics.RIPPLE_MS)+max(lags.values(),default=0),step,self.reset_wave)
 
     def reset_wave(self):
         if getattr(self,'_refresh_files',None):self._refresh_files.stop()
@@ -850,15 +1145,20 @@ class FileList(QListWidget):
             self.glide(self.select_levels,path,1.0 if path in chosen else 0.0,SNAPPY if path in chosen else (.32,1.0))
         self.chosen=chosen
 
-    def mouseMoveEvent(self,event):
-        item=self.itemAt(event.position().toPoint())
+    def update_hover(self,point,sound=True):
+        item=self.itemAt(point)
         path=item.data(Qt.UserRole)['path'] if item else None
         if path!=self.hover_path:
             if self.hover_path is not None:
                 self.glide(self.hover_levels,self.hover_path,0.0,(.4,.95))
             if path is not None:
                 self.glide(self.hover_levels,path,1.0,SNAPPY)
+                if sound:
+                    self.hovered.emit(self.row(item))
             self.hover_path=path
+
+    def mouseMoveEvent(self,event):
+        self.update_hover(event.position().toPoint())
         super().mouseMoveEvent(event)
 
     def leaveEvent(self,event):
@@ -868,7 +1168,20 @@ class FileList(QListWidget):
         super().leaveEvent(event)
 
     def set_entries(self,entries):
-        changed=[f['path'] for f in entries]!=[self.item(i).data(Qt.UserRole)['path'] for i in range(self.count())]
+        old=[self.item(i).data(Qt.UserRole)['path'] for i in range(self.count())]
+        new=[f['path'] for f in entries]
+        changed=new!=old
+        # A refreshed or re-scanned view keeps its place: the row at the top
+        # stays put instead of the list snapping back to the start. A different
+        # view (another filter or sort order) starts at the top as usual.
+        anchor=None
+        if changed and old and self.verticalScrollBar().value()>0:
+            kept_old,kept_new=set(old),set(new)
+            common=kept_old&kept_new
+            if len(common)>=.6*len(old) and [p for p in old if p in kept_new]==[p for p in new if p in kept_old]:
+                top=self.indexAt(QPoint(12,12))
+                if top.isValid():
+                    anchor=(old[top.row()],self.visualRect(top).top())
         selected={item.data(Qt.UserRole)['path'] for item in self.selectedItems()}
         self.blockSignals(True);self.clear()
         for file in entries:
@@ -880,8 +1193,69 @@ class FileList(QListWidget):
         self.select_levels={path:1.0 for path in self.chosen}
         self.hover_path=None
         self.selection_changed.emit();self.viewport().update()
-        if changed:
+        if not changed:
+            return
+        physics.cancel(self,'scroll')
+        self.overscroll=0.0
+        rows={path:row for row,path in enumerate(new)}
+        if anchor and anchor[0] in rows:
+            self.doItemsLayout()
+            index=self.model().index(rows[anchor[0]],0)
+            bar=self.verticalScrollBar()
+            bar.setValue(max(0,round(bar.value()+self.visualRect(index).top()-anchor[1])))
+        else:
+            # A new view starts at its first row (Qt keeps the old offset
+            # across clear() until the next layout).
+            self.verticalScrollBar().setValue(0)
             self.play_entrance()
+
+    def paint_edges(self,p):
+        """Rows dissolve into the living backdrop where the list continues."""
+        surface=getattr(self.window(),'surface',None)
+        if surface is None or getattr(surface,'frame',None) is None or not hasattr(surface,'paint_backdrop'):
+            return
+        view,bar=self.viewport(),self.verticalScrollBar()
+        dpr=view.devicePixelRatioF()
+        for at_top,active in ((True,bar.value()>1),(False,bar.value()<bar.maximum()-1)):
+            if not active:
+                continue
+            height=28 if at_top else 40
+            rect=QRectF(0,0 if at_top else view.height()-height,view.width(),height)
+            state=(surface.frame_key,view.width(),view.height(),dpr,view.mapTo(surface,QPoint(0,0)).toTuple())
+            cached=self.faces.get(at_top)
+            if cached is None or cached[0]!=state:
+                strip=QPixmap(max(1,round(rect.width()*dpr)),max(1,round(height*dpr)))
+                strip.setDevicePixelRatio(dpr)
+                strip.fill(Qt.transparent)
+                q=QPainter(strip)
+                surface.paint_backdrop(q,view,rect,QRectF(0,0,rect.width(),height))
+                q.setCompositionMode(QPainter.CompositionMode_DestinationIn)
+                ramp=QLinearGradient(0,0,0,height)
+                ramp.setColorAt(0,QColor(0,0,0,255 if at_top else 0))
+                ramp.setColorAt(1,QColor(0,0,0,0 if at_top else 255))
+                q.fillRect(QRectF(0,0,rect.width(),height),ramp)
+                q.end()
+                cached=(state,strip)
+                self.faces[at_top]=cached
+            p.drawPixmap(rect.topLeft(),cached[1])
+
+    def paint_thumb(self,p):
+        """An overlay thumb that appears while the list moves, squashing at the ends."""
+        bar=self.verticalScrollBar()
+        if self.thumb<=.01 or bar.maximum()<=0:
+            return
+        view=self.viewport()
+        height=view.height()
+        length=max(32.0,height*height/(bar.maximum()+height))
+        travel=height-length-8
+        y=4+travel*bar.value()/bar.maximum()
+        squash=min(length-12,abs(self.overscroll)*.8)
+        length-=squash
+        if self.overscroll<0:
+            y+=squash
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(255,255,255,int(110*self.thumb)))
+        p.drawRoundedRect(QRectF(view.width()-7,y,3,length),1.5,1.5)
 
     def rowCount(self):return self.count()
     def selectRow(self,index):
@@ -893,6 +1267,18 @@ class FileList(QListWidget):
         else:super().keyPressEvent(event)
     def paintEvent(self,event):
         super().paintEvent(event)
+        if self.count():
+            p=QPainter(self.viewport())
+            p.setRenderHints(QPainter.Antialiasing|QPainter.SmoothPixmapTransform)
+            if self.warp_ghost is not None and self.warp>.01:
+                # The rows we left slide away and dissolve through the backdrop
+                # while the arriving rows fade up (see row_motion), never both at once.
+                p.setOpacity(self.warp**2.5)
+                p.drawPixmap(QPointF(0,snap(-self.warp_sign*(1-self.warp)*self.viewport().height()*.5,self.devicePixelRatioF())),self.warp_ghost)
+                p.setOpacity(1.0)
+            self.paint_edges(p)
+            self.paint_thumb(p)
+            return
         if not self.count():
             p=QPainter(self.viewport())
             p.setRenderHints(QPainter.Antialiasing|QPainter.TextAntialiasing|QPainter.SmoothPixmapTransform)

@@ -9,19 +9,20 @@ from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout, QHBoxLayout,
     QGridLayout, QPushButton, QLabel, QStackedWidget, QLineEdit, QComboBox, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView, QSplitter, QScrollArea, QProgressBar, QMessageBox, QFileDialog,
-    QPlainTextEdit, QCheckBox, QFormLayout, QDialog, QDialogButtonBox, QMenu, QLayout, QSizePolicy, QAbstractScrollArea)
+    QPlainTextEdit, QCheckBox, QFormLayout, QDialog, QDialogButtonBox, QMenu, QLayout, QSizePolicy, QAbstractScrollArea, QSlider, QInputDialog)
 from . import __version__, apps, indexer
 from .storage import Settings, user_dir, atomic_json, read_json, history, activity
 from .design import icon, stylesheet, fade, palette, native_theme, search_icon
 from . import physics
 from .ambient import Ambient
 from .surfaces import Atmosphere, GradientTile
-from .motion import MotionButton, MotionIcon, OrbButton, SceneTransition, reveal_page, cascade, snapshot, spring, enabled
-from .choreo import KineticLabel, Shockwave, ZoomThrough
+from .motion import MotionButton, MotionIcon, OrbButton, SceneTransition, reveal_page, cascade, snapshot, spring, enabled, motion_blocks, ripple_blocks, SmoothWheel
+from .choreo import KineticLabel, Shockwave, ZoomThrough, StatusLine, Hairline
 from .window_chrome import RoundedShell, Caption, ResizeFrame
 from .project_browser import GridCards, FileList, ActivityList, ProjectArtwork
 from .project_metadata import StageStore, STAGES, STAGE_NOTES, ALL_STAGES, stage_folder
 from .cards import CardSurface, round_surface
+from .sound import SoundEngine
 
 
 class Worker(QThread):
@@ -93,9 +94,13 @@ class MainWindow(QMainWindow):
         initialize()
         self.settings = settings or Settings()
         self.core = core
+        # Soft spatial cues timed to the motion; silent when muted or unavailable.
+        self.sound = SoundEngine(self)
+        self._refresh_cue = None
         self.projects, self.files, self.display_files, self.jobs = [], [], [], []
         self.project, self.preview = None, None
         self.project_section = 'work'
+        self.selected_area = None
         self.selected_collection = None
         self.setWindowTitle("Neotrix Prism")
         self.setObjectName("workspaceWindow")
@@ -185,15 +190,17 @@ class MainWindow(QMainWindow):
         self.pages = {}
         body.addWidget(self.stack, 1)
         footer_host = QWidget()
-        footer_host.setFixedHeight(84)
+        # The orb's transparent canvas must fit inside its parent too; otherwise
+        # Qt clips the hover halo and busy rings at the footer boundary.
+        footer_host.setFixedHeight(112)
         footer = QGridLayout(footer_host)
         footer.setContentsMargins(0,0,0,0)
         footer.setColumnStretch(0,1)
         footer.setColumnStretch(2,1)
         # Status lines roll in quickly; rapid progress updates swap instantly.
-        self.status = KineticLabel("Ready", rise=12, stagger=7, tracking=0, quiet=450)
-        self.status.setObjectName("subtitle")
-        self.status.setWordWrap(True)
+        # One quiet line: elided in the middle, full text in its tooltip.
+        self.status = StatusLine("Ready")
+        self.status.setObjectName("statusLine")
         self.status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         footer.addWidget(self.status,0,0)
         self.orb = OrbButton()
@@ -209,12 +216,11 @@ class MainWindow(QMainWindow):
         task_layout = QHBoxLayout(task_controls)
         task_layout.setContentsMargins(0,0,0,0)
         task_layout.addStretch()
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setFixedWidth(180)
-        self.progress_bar.hide()
-        task_layout.addWidget(self.progress_bar)
+        # Work in progress reads as a thin line of light, not a bar.
+        self.progress_bar = Hairline()
+        task_layout.addWidget(self.progress_bar, 0, Qt.AlignVCenter)
         self.cancel_button = button("Cancel", self.cancel_jobs)
+        self.cancel_button.setObjectName("quietAction")
         self.cancel_button.hide()
         task_layout.addWidget(self.cancel_button)
         footer.addWidget(task_controls,0,2)
@@ -234,8 +240,34 @@ class MainWindow(QMainWindow):
         back.setShortcut(QKeySequence('Alt+Left'))
         back.triggered.connect(self.browse_back)
         self.addAction(back)
+        self.wire_sound()
         self.navigate("Projects")
         self.load_projects()
+
+        from .updater import portable_root
+        if portable_root(Path(__file__).resolve().parents[1]) and not os.environ.get('PYTEST_CURRENT_TEST') and not os.environ.get('NEOTRIX_DISABLE_UPDATE_CHECK'):
+            QTimer.singleShot(3500,self,lambda:self.updates.check_now(automatic=True))
+
+    def wire_sound(self):
+        """Buttons click and breathe on hover; cards and rows answer the pointer
+        with a note placed where they sit on screen."""
+        self.orb.silent_press = True  # the orb answers with the refresh or cancel cue instead
+        self.sound.wire(self)
+        for grid in (self.project_cards, self.choice_cards, self.favorite_cards):
+            grid.hovered.connect(lambda index, grid=grid: self.card_hover(grid, index))
+            grid.pressed.connect(lambda index: self.sound.play('press-card'))
+        for rows in (self.file_cards, self.activity_list):
+            rows.hovered.connect(lambda row: self.sound.play('hover-soft', hover=True))
+            rows.itemSelectionChanged.connect(lambda rows=rows: rows.selectedItems() and self.sound.play('select'))
+
+    def card_hover(self, grid, index):
+        rect = grid.card_rects().get(index)
+        if rect is not None and self.isActiveWindow():
+            self.sound.at('hover', self.screen_x(grid, rect.center().toPoint()), hover=True)
+
+    def screen_x(self, widget, point):
+        """Horizontal position of a widget point across the window, 0..1 (for stereo placement)."""
+        return widget.mapTo(self, point).x()/max(1, self.width())
 
     def page(self, name):
         widget = QWidget()
@@ -312,7 +344,7 @@ class MainWindow(QMainWindow):
             for item in self.findChildren(MotionButton):
                 item.reset_wave()
         self.orb.set_busy(bool(self.jobs))
-        self.progress_bar.setVisible(bool(self.jobs) and not self.settings.data["reduced_motion"])
+        self.progress_bar.set_active(bool(self.jobs) and not self.settings.data["reduced_motion"])
 
     def move_selection(self, name):
         """The rail's two ends travel on different springs: the leading edge
@@ -355,6 +387,7 @@ class MainWindow(QMainWindow):
                 self.selection_rail.setGeometry(self.nav[current].geometry())
         spring(self, 'sidebar', 76 if self.compact_sidebar else 180, step, value=self.sidebar.width(),
                feel=(.4, .84), precision=.2)
+        self.sound.play('sidebar-close' if self.compact_sidebar else 'sidebar-open')
         if not self.compact_sidebar:
             for label in (self.brand_label, self.version_label):
                 reveal_page(label, 80, 10)
@@ -392,6 +425,8 @@ class MainWindow(QMainWindow):
             return categories.get(self.selected_collection,{'assets':'Assets','preview':'Preview'}[self.project_section])
         if getattr(self, 'browse_step', None) == 'files' and self.selected_stage:
             return 'All stages' if self.selected_stage == ALL_STAGES else STAGES[self.selected_stage]
+        if getattr(self,'browse_step',None)=='files' and self.project_section=='work' and self.selected_area:
+            return indexer.WORK_AREAS[self.selected_area]
         return Path(self.project).name
 
     def projects_scene(self):
@@ -429,6 +464,10 @@ class MainWindow(QMainWindow):
             nav.setChecked(key == name)
         if previous is not None and previous is not self.pages[name] and enabled(self):
             self.nav[name].hop()
+        if previous is not None and previous is not self.pages[name]:
+            # Air follows the old page out; the new page arrives on its own interval.
+            self.sound.play('nav-whoosh-down' if direction > 0 else 'nav-whoosh-up')
+            self.sound.play('nav-'+name.lower(), delay=90)
         self.stack.setCurrentWidget(self.pages[name])
         scene = self.projects_scene() if name == "Projects" else {"Favorites": 2, "Activity": 3, "Settings": 4}[name]
         if previous is not None and previous is not self.pages[name]:
@@ -519,7 +558,14 @@ class MainWindow(QMainWindow):
         self.file_kind = QComboBox()
         self.file_kind.addItem("Working files", "working")
         self.file_kind.addItem("Outputs & previews", "output")
+        self.file_kind.addItem("All files", "")
         self.file_kind.currentIndexChanged.connect(self.filter_files)
+        self.ai_filter = QComboBox()
+        self.ai_filter.addItem('All AI files', '')
+        for key, title in indexer.AI_COLLECTIONS.items():
+            self.ai_filter.addItem(title, key)
+        self.ai_filter.currentIndexChanged.connect(self.filter_files)
+        controls_layout.addWidget(self.ai_filter)
         row.addWidget(self.file_kind)
         self.filters = {}
         for key, title in (("application", "All applications"),):
@@ -569,11 +615,10 @@ class MainWindow(QMainWindow):
         more_menu = QMenu(detail)
         round_surface(more_menu)
         for index,(text, callback, primary) in enumerate((("Open file", self.open_selected, True), ("Open with…", self.open_with, False),
-                                         ("Save new version", self.save_selected_version, False),
                                          ("Reveal in Explorer", self.reveal_selected, False), ("Copy path", self.copy_selected, False),
                                          ("Favorite file", self.favorite_selected, False))):
             if index in (0,2):
-                item = button('Open file' if index==0 else 'Save version',callback,primary)
+                item = button(text,callback,primary)
                 item.setMinimumHeight(44)
                 item.setStyleSheet('padding: 8px 6px; font-size: 12px;')
                 item.setAccessibleName(text)
@@ -600,6 +645,11 @@ class MainWindow(QMainWindow):
         """Open a card with a shared-element zoom: its colour field becomes the
         next level and its artwork flies through, then the new level cascades."""
         source = grid.zoom_source(index) if enabled(self) and self.isVisible() and grid.isVisible() else None
+        if source:
+            # The rise starts where the card sits in the stereo field and arrives centre stage.
+            self.sound.at('open', self.screen_x(grid, source['rect'].center().toPoint()))
+        else:
+            self.sound.play('open-center')
         host = self.pages['Projects']
         picture = snapshot(grid) if source else None
         offset = grid.mapTo(host, QPoint(0, 0))
@@ -633,6 +683,7 @@ class MainWindow(QMainWindow):
         if returning:
             # Going back up a level: content settles down from above.
             cascade(self.project_views, 0, -26)
+            self.sound.play('back')
 
     @staticmethod
     def variant_of(file):
@@ -646,8 +697,10 @@ class MainWindow(QMainWindow):
         elif self.project_section in ('assets','preview'):
             self.breadcrumb_clicked('collections' if self.browse_step=='files' else 'sections')
         elif self.browse_step=='files':
-            self.breadcrumb_clicked('stages')
-        elif self.browse_step=='stages' and any(self.variant_of(f)!='General' for f in self.files if indexer.in_section(f,'work')):
+            self.breadcrumb_clicked('stages' if self.selected_area=='3d' else 'areas')
+        elif self.browse_step=='stages':
+            self.breadcrumb_clicked('areas')
+        elif self.browse_step=='areas' and any(self.variant_of(f)!='General' for f in self.files if indexer.in_section(f,'work')):
             self.breadcrumb_clicked('versions')
         else:self.breadcrumb_clicked('sections')
 
@@ -656,6 +709,7 @@ class MainWindow(QMainWindow):
             self.browse_projects()
             return
         if target == 'sections':
+            self.selected_area = None
             self.selected_variant = self.selected_stage = None
             self.selected_collection = None
             self.project_section = 'work'
@@ -664,8 +718,12 @@ class MainWindow(QMainWindow):
             self.selected_collection = None
             self.browse_step = 'collections'
         elif target == 'versions':
+            self.selected_area = None
             self.selected_variant = self.selected_stage = None
             self.browse_step = 'versions'
+        elif target == 'areas':
+            self.selected_area = self.selected_stage = None
+            self.browse_step = 'areas'
         elif target == 'stages':
             self.selected_stage = None
             self.browse_step = 'stages'
@@ -674,6 +732,7 @@ class MainWindow(QMainWindow):
         self.scene(self.projects_scene())
         self._wave_origin = None
         cascade(self.work_panel, 0, -26)
+        self.sound.play('back')
 
     def update_browser(self):
         if not self.project:
@@ -683,11 +742,14 @@ class MainWindow(QMainWindow):
         variants = sorted({self.variant_of(f) for f in workfiles},key=indexer.natural)
         if self.browse_step != 'sections' and self.selected_variant is not None and self.selected_variant not in variants and not self.scan_pending:
             self.selected_variant = self.selected_stage = None
+            self.selected_area = None
             self.browse_step = 'versions'
         named = any(v != 'General' for v in variants)
         if self.browse_step == 'versions' and not named and (self.files or not self.scan_pending):
-            self.browse_step = 'stages'
+            self.browse_step = 'areas'
         file_mode = self.browse_step == 'files'
+        self.ai_filter.setVisible(file_mode and self.project_section=='work' and self.selected_area=='ai_generation')
+        self.assign_button.setVisible(file_mode and self.project_section=='work' and self.selected_area in (None,'3d','other'))
         self.choice_cards.setVisible(not file_mode)
         self.file_controls.setVisible(file_mode)
         self.file_split.setVisible(file_mode)
@@ -702,9 +764,12 @@ class MainWindow(QMainWindow):
         elif self.browse_step != 'sections':
             crumbs += '  ›  <a href="versions" style="color:#f3dcff">'+('Versions' if named else 'Working files')+'</a>'
         if self.project_section == 'work' and self.selected_variant is not None:
-            crumbs += '  ›  <a href="stages" style="color:#f3dcff">'+html.escape(self.selected_variant)+'</a>'
+            crumbs += '  ›  <a href="areas" style="color:#f3dcff">'+html.escape(self.selected_variant)+'</a>'
         elif self.project_section == 'work' and self.browse_step not in ('versions','sections'):
-            crumbs += '  ›  <a href="stages" style="color:#f3dcff">Stages</a>'
+            crumbs += '  ›  <a href="areas" style="color:#f3dcff">Work areas</a>'
+        if self.selected_area:
+            area_title = indexer.WORK_AREAS[self.selected_area]
+            crumbs += '  ›  <a href="stages" style="color:#f3dcff">'+area_title+'</a>' if self.selected_area=='3d' else '  ›  '+area_title
         if self.selected_stage is not None:
             crumbs += '  ›  '+('All stages' if self.selected_stage == ALL_STAGES else STAGES[self.selected_stage])
         self.breadcrumb.setText(crumbs)
@@ -739,8 +804,17 @@ class MainWindow(QMainWindow):
             version_art=str(Path(__file__).resolve().parents[1]/'assets/ui-icons/versions.png')
             entries = [{'name':v,'path':v,'application':'VERSION','artwork':version_art,'subtitle':f"{sum(self.variant_of(f)==v for f in workfiles)} files · Choose version →"} for v in variants]
             self.choice_cards.empty_message = 'Discovering project versions…' if self.scan_pending else 'No working files found in this project.'
+        elif self.browse_step == 'areas':
+            scoped = [f for f in workfiles if self.selected_variant is None or self.variant_of(f)==self.selected_variant]
+            art = {'3d':('stage-icons','modelling.png'),'graphic_design':('project-art','design.png'),
+                   'motion_graphics':('project-art','motion.png'),'ai_generation':('project-art','idea.png'),
+                   'other':('project-art','compass.png')}
+            entries = [{'name':title,'path':key,'application':'AREA','artwork':self.asset(*art[key]),
+                        'details':f"{plural(sum(indexer.work_area(f)==key for f in scoped), 'file')} · Open →"}
+                       for key,title in indexer.WORK_AREAS.items() if key!='other' or any(indexer.work_area(f)=='other' for f in scoped)]
         elif self.browse_step == 'stages':
             scoped = [f for f in workfiles if f.get('kind','working')=='working'
+                      and (self.selected_area is None or indexer.work_area(f)==self.selected_area)
                       and (self.selected_variant is None or self.variant_of(f)==self.selected_variant)]
             counts = {}
             for f in scoped:
@@ -753,7 +827,7 @@ class MainWindow(QMainWindow):
                         'details':f"{plural(len(scoped), 'working file')} across every stage",
                         'subtitle':f"{plural(len(scoped), 'file')} · Open all →"}]
             for key,title in STAGES.items():
-                if key == 'unassigned' and not counts.get(key):
+                if key == 'unassigned':
                     continue
                 artwork=self.stage_artwork(key)
                 entries.append({'name':title,'path':key,'application':'STAGE',
@@ -771,6 +845,7 @@ class MainWindow(QMainWindow):
         entries=self.choice_cards.entries
         if not 0<=index<len(entries):return
         if self.browse_step == 'sections':
+            self.selected_area = None
             self.project_section = entries[index]['path']
             self.selected_variant = self.selected_stage = None
             self.selected_collection = None
@@ -783,7 +858,14 @@ class MainWindow(QMainWindow):
         elif self.browse_step == 'versions':
             self.selected_variant=entries[index]['path']
             self.selected_stage=None
-            self.browse_step='stages'
+            self.selected_area=None
+            self.browse_step='areas'
+        elif self.browse_step == 'areas':
+            self.selected_area=entries[index]['path']
+            self.selected_stage=None
+            self.browse_step='stages' if self.selected_area=='3d' else 'files'
+            self.file_kind.setCurrentIndex(2 if self.selected_area=='ai_generation' else 0)
+            self.ai_filter.setCurrentIndex(0)
         else:
             self.selected_stage=entries[index]['path']
             self.browse_step='files'
@@ -800,13 +882,15 @@ class MainWindow(QMainWindow):
         layout=QVBoxLayout(dialog)
         layout.addWidget(label(f'Assign a stage to {len(files)} selected file(s).','section'))
         combo=QComboBox()
-        for key,title in STAGES.items():combo.addItem(title,key)
+        for key,title in STAGES.items():
+            if key!='unassigned':combo.addItem(title,key)
         combo.setCurrentIndex(combo.findData(self.stage_store.stage(files[0],self.stage_document)))
         layout.addWidget(combo)
         layout.addWidget(label('Files stay in their existing folders. Labels are shared with the project team.','subtitle',True))
         buttons=QDialogButtonBox(QDialogButtonBox.Save|QDialogButtonBox.Cancel)
         buttons.accepted.connect(dialog.accept);buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
+        self.sound.play('dialog')
         if dialog.exec()!=QDialog.Accepted:return
         self.apply_stage(files,combo.currentData())
 
@@ -817,6 +901,7 @@ class MainWindow(QMainWindow):
             self.stage_document=document
             self.filter_files()
             self.status.setText(f'{len(files)} files assigned to {STAGES[stage]}')
+            self.sound.play('success')
             activity('Stage assigned',path=project,stage=stage,count=len(files))
         def failed(message):
             if self.project==project:
@@ -826,19 +911,22 @@ class MainWindow(QMainWindow):
         self.worker(lambda job:store.save([f['path'] for f in files],stage,expected),saved,failed)
 
     def search_projects(self):
+        before = list(getattr(self, 'filtered_projects', []))
         self.render_projects()
         self.browse_projects()
+        if self.filtered_projects != before:
+            self.sound.play('shuffle')
 
     def worker(self, fn, done, failure=None):
         job = Worker(fn)
         job.result.connect(done)
         job.failure.connect(failure or self.error)
-        job.progress.connect(lambda count, directory: self.status.setText(f"Found {count} files · {directory}"))
+        job.progress.connect(lambda count, directory: self.status.setText(f"{count:,} files found  ·  {Path(directory).name or directory}"))
         job.finished.connect(lambda: self.finished_job(job))
         self.jobs.append(job)
         self.orb.show()
         self.orb.set_busy(True)
-        self.progress_bar.setVisible(not self.settings.data["reduced_motion"])
+        self.progress_bar.set_active(not self.settings.data["reduced_motion"])
         self.cancel_button.show()
         job.start()
         return job
@@ -850,10 +938,18 @@ class MainWindow(QMainWindow):
         if not self.jobs:
             self.orb.set_busy(False)
             self.orb.show()
-            self.progress_bar.hide()
+            self.progress_bar.set_active(False)
             self.cancel_button.hide()
+            if self._refresh_cue is not None:
+                # Resolve once the wave has played through, never on top of it.
+                elapsed = (time.monotonic()-self._refresh_cue)*1000
+                self._refresh_cue = None
+                self.sound.play('done', delay=max(120, 1100-elapsed))
 
     def cancel_jobs(self):
+        if self.jobs and not getattr(self, '_closing', False):
+            self.sound.play('cancel')
+        self._refresh_cue = None
         for job in self.jobs:
             job.cancel.set()
         self.status.setText("Cancelling…")
@@ -920,6 +1016,7 @@ class MainWindow(QMainWindow):
             self.selected_stage = None
             self.browse_step = "sections"
             self.project_section = 'work'
+            self.selected_area = None
             self.selected_collection = None
         self.project = path
         self.project_views.hide()
@@ -984,11 +1081,15 @@ class MainWindow(QMainWindow):
             combo.blockSignals(False)
 
     def filter_files(self):
+        before = [f['path'] for f in self.display_files]
+        typed = self.sender() in (getattr(self, 'file_search', None), getattr(self, 'file_kind', None), *getattr(self, 'filters', {}).values())
         self.file_cards.empty_message = 'No files match these filters. Try another application or clear your search.' if self.project else 'Choose a project above to discover its creative files.'
         search = self.file_search.text().lower()
         self.display_files = [f for f in self.files if indexer.in_section(f,self.project_section)
                               and (self.selected_collection is None or (indexer.asset_category(f) if self.project_section=='assets' else indexer.preview_group(f))==self.selected_collection)
-                              and (self.project_section in ('assets','preview') or f.get("kind", "working") == self.file_kind.currentData())
+                              and (self.project_section in ('assets','preview') or not self.file_kind.currentData() or f.get("kind", "working") == self.file_kind.currentData())
+                              and (self.project_section!='work' or self.selected_area is None or indexer.work_area(f)==self.selected_area)
+                              and (self.project_section!='work' or self.selected_area!='ai_generation' or not self.ai_filter.currentData() or indexer.ai_collection(f)==self.ai_filter.currentData())
                               and search in f["relative"].lower()
                               and all(not combo.currentData() or f[key] == combo.currentData() for key, combo in self.filters.items())]
         everything = self.selected_stage == ALL_STAGES
@@ -1007,6 +1108,8 @@ class MainWindow(QMainWindow):
         self.file_cards.set_entries(self.display_files)
         self.update_browser()
         self.update_details()
+        if typed and [f['path'] for f in self.display_files] != before:
+            self.sound.play('shuffle')
 
     def selected(self):
         row = self.file_cards.currentRow()
@@ -1038,7 +1141,9 @@ class MainWindow(QMainWindow):
         location = '  ›  '.join(folders[-4:]) if folders else Path(file['path']).parent.name
         size = file['size']
         weight = f"{size/1048576:.1f} MB" if size >= 1048576 else f"{max(1, round(size/1024))} KB"
-        self.detail_info.setPlainText(file["application"] + " · " + file["version"] + "\n" + file["department"] + " · " + STAGES[self.stage_store.stage(file,self.stage_document)]
+        context = (indexer.AI_COLLECTIONS.get(indexer.ai_collection(file),'Other AI files')
+                   if self.selected_area=='ai_generation' else STAGES[self.stage_store.stage(file,self.stage_document)])
+        self.detail_info.setPlainText(file["application"] + " · " + file["version"] + "\n" + file["department"] + " · " + context
                                  + "\n" + weight + "\n\n" + location)
         self.detail_info.setToolTip(file["path"])
         pixmap=QPixmap()
@@ -1052,7 +1157,7 @@ class MainWindow(QMainWindow):
         self.preview_source=pixmap if not pixmap.isNull() else icon(file['application'],256).pixmap(256,256)
         self.fit_preview()
         self.file_actions[-1].setText("Unfavorite file" if file["path"] in self.settings.data["favorites"] else "Favorite file")
-        self.file_actions[2].setEnabled(file["application"] in ("Blender", "Photoshop", "After Effects"))
+        self.file_actions[2].setEnabled(True)
 
     def fit_preview(self):
         source=getattr(self,'preview_source',None)
@@ -1067,6 +1172,7 @@ class MainWindow(QMainWindow):
         application = application or indexer.EXTENSIONS.get(Path(path).suffix.lower(), "")
         apps.open_file(path, application, self.settings.data["apps"], executable)
         activity("File opened", path=path, application=application)
+        self.sound.play('launch')
         self.status.setText("Opened " + Path(path).name)
 
     def file_comments(self, filepath=None, application='Neotrix Prism'):
@@ -1077,6 +1183,7 @@ class MainWindow(QMainWindow):
             filepath = selected['path']
         from .comment_dialog import CommentDialog
         dialog = CommentDialog(filepath, self, application)
+        self.sound.play('dialog')
         dialog.exec()
 
     def open_selected(self):
@@ -1110,11 +1217,13 @@ class MainWindow(QMainWindow):
         if file:
             QApplication.clipboard().setText(file["path"])
             self.status.setText("File path copied")
+            self.sound.play('copy')
 
     def favorite_selected(self):
         file = self.selected()
         if file:
             self.settings.favorite(file["path"])
+            self.sound.play('favorite-add' if file["path"] in self.settings.data["favorites"] else 'favorite-remove')
             self.update_details()
 
     def save_selected_version(self):
@@ -1203,10 +1312,12 @@ class MainWindow(QMainWindow):
         actions = QHBoxLayout()
         actions.addWidget(button("Favorite current project", self.favorite_project))
         actions.addWidget(button("Remove selected favorite", self.remove_favorite))
+        actions.addWidget(button("Restore favorites…", self.restore_favorites))
         actions.addStretch()
         layout.addLayout(actions)
 
     def refresh_favorites(self):
+        self.settings.reload()
         entries = []
         for path in self.settings.data["favorites"]:
             application = indexer.EXTENSIONS.get(Path(path).suffix.lower(), '')
@@ -1215,11 +1326,30 @@ class MainWindow(QMainWindow):
                             'artwork': self.file_artwork(path, application) if is_file else self.artwork.request(path),
                             'subtitle': (application or 'Media')+' file · Open →' if is_file else 'Project · Explore project →'})
         self.favorite_cards.set_entries(entries)
+        if self.settings.recovery_notice:
+            self.status.setText(self.settings.recovery_notice)
+
+    def restore_favorites(self):
+        backups=self.settings.favorite_backups()
+        if not backups:
+            self.status.setText('No favorites backups yet. Automatic backups start with this version.')
+            return
+        choices=[time.strftime('%d %b %Y · %H:%M:%S',time.localtime(path.stat().st_mtime))+
+                 f' · {len(items)} favorite(s) · {i+1}' for i,(path,items) in enumerate(backups)]
+        selected,ok=QInputDialog.getItem(self,'Restore favorites','Choose a backup to merge with your current favorites:',choices,0,False)
+        if ok:
+            try:
+                self.settings.restore_favorites(backups[choices.index(selected)][0])
+                self.refresh_favorites()
+                self.status.setText('Favorites restored. Existing favorites were kept.')
+                self.sound.play('success')
+            except Exception as exc:self.error(str(exc))
 
     def favorite_project(self):
         if self.project:
             if self.project not in self.settings.data["favorites"]:
                 self.settings.favorite(self.project)
+                self.sound.play('favorite-add')
             self.refresh_favorites()
         else:
             self.status.setText("Select a project first.")
@@ -1228,6 +1358,7 @@ class MainWindow(QMainWindow):
         index = self.favorite_cards.selected_index if index is None or index is False else index
         if 0 <= index < len(self.favorite_cards.entries):
             self.settings.favorite(self.favorite_cards.entries[index]['path'])
+            self.sound.play('favorite-remove')
             self.refresh_favorites()
 
     def favorite_menu(self, index, position):
@@ -1238,6 +1369,7 @@ class MainWindow(QMainWindow):
         menu.addAction('Reveal in Explorer', lambda: apps.reveal(path))
         menu.addSeparator()
         menu.addAction('Remove from favorites', lambda: self.remove_favorite(index))
+        self.sound.play('menu')
         menu.exec(position)
 
     def open_favorite(self, index):
@@ -1298,6 +1430,7 @@ class MainWindow(QMainWindow):
         layout = self.page("Settings")
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        self.settings_wheel = SmoothWheel(scroll)
         content = QWidget()
         form_layout = QVBoxLayout(content)
         frame, inner = card()
@@ -1329,9 +1462,40 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         self.reduced = QCheckBox("Reduce motion")
         self.reduced.setChecked(self.settings.data["reduced_motion"])
+        self.reduced.toggled.connect(lambda on: self.sound.play('toggle-on' if on else 'toggle-off'))
         row.addWidget(self.reduced)
         row.addStretch()
         inner.addLayout(row)
+        # Sound applies immediately, so every change can be heard as it is made.
+        row = QHBoxLayout()
+        self.sound_box = QCheckBox("Sound effects")
+        self.sound_box.setChecked(self.settings.data["sound"])
+        self.sound_box.setToolTip("Soft interface sounds timed to each animation")
+        self.hover_box = QCheckBox("Hover sounds")
+        self.hover_box.setChecked(self.settings.data["sound_hover"])
+        self.hover_box.setToolTip("A quiet note as the pointer meets cards, rows and buttons")
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(self.settings.data["sound_volume"])
+        self.volume_slider.setFixedWidth(200)
+        self.volume_slider.setAccessibleName("Sound volume")
+        row.addWidget(self.sound_box)
+        row.addSpacing(16)
+        row.addWidget(self.hover_box)
+        row.addSpacing(16)
+        row.addWidget(label("Volume", "subtitle"))
+        row.addSpacing(6)
+        row.addWidget(self.volume_slider)
+        row.addStretch()
+        inner.addLayout(row)
+        self.volume_preview = QTimer(self)
+        self.volume_preview.setSingleShot(True)
+        self.volume_preview.timeout.connect(self.sound_changed)
+        self.sound_box.toggled.connect(self.sound_changed)
+        self.hover_box.toggled.connect(self.sound_changed)
+        self.volume_slider.valueChanged.connect(lambda value: self.volume_preview.start(160))
+        self.hover_box.setEnabled(self.sound_box.isChecked())
+        self.volume_slider.setEnabled(self.sound_box.isChecked())
         form_layout.addWidget(frame)
         frame, inner = card()
         inner.addWidget(label('Prism', 'section'))
@@ -1350,6 +1514,8 @@ class MainWindow(QMainWindow):
         inner.addWidget(pipeline, 0, Qt.AlignLeft)
         form_layout.addWidget(frame)
         form_layout.addWidget(button("Save settings", self.save_settings, True))
+        from .update_panel import UpdatePanel
+        self.updates = UpdatePanel(self,form_layout)
         form_layout.addStretch()
         scroll.setWidget(content)
         layout.addWidget(scroll)
@@ -1357,6 +1523,24 @@ class MainWindow(QMainWindow):
         if not self.settings.data["apps"]:
             self.settings.data["apps"] = detected
             self.settings.save()
+
+    def sound_changed(self, *args):
+        """Apply sound settings now and let the change be heard."""
+        source = self.sender()
+        on = self.sound_box.isChecked()
+        if source is self.sound_box and not on:
+            self.sound.play('toggle-off')
+        self.settings.data.update(sound=on, sound_hover=self.hover_box.isChecked(),
+                                  sound_volume=self.volume_slider.value())
+        self.settings.save()
+        self.hover_box.setEnabled(on)
+        self.volume_slider.setEnabled(on)
+        if source is self.sound_box and on:
+            self.sound.play('toggle-on')
+        elif source is self.hover_box:
+            self.sound.play('toggle-on' if self.hover_box.isChecked() else 'toggle-off')
+        elif source is self.volume_preview:
+            self.sound.play('select')
 
     def add_root(self):
         root = QFileDialog.getExistingDirectory(self, "Add project-library root")
@@ -1379,8 +1563,11 @@ class MainWindow(QMainWindow):
         self.apply_theme()
         self.load_projects()
         self.status.setText("Settings saved")
+        self.sound.play('success')
 
     def refresh(self):
+        self._refresh_cue = time.monotonic()
+        self.sound.play('refresh')
         if self.stack.currentWidget() == self.pages["Favorites"]:
             self.refresh_favorites()
         elif self.stack.currentWidget() == self.pages["Activity"]:
@@ -1408,21 +1595,49 @@ class MainWindow(QMainWindow):
                     tile.refresh_wave(reach(tile))
             for item in self.nav.values():
                 item.refresh_wave(reach(item))
+            # Every other panel rides the wave too: pushed away from the orb as
+            # the front passes, then one rebound (translation only).
+            blocks = [block for block in motion_blocks(page) if not isinstance(block, (GridCards, FileList, QAbstractScrollArea))]
+            ripple_blocks(self.surface, blocks+[self.page_title], QPointF(centre), Shockwave.SPEED)
+            self.shockwave.raise_()  # the light passes over the riding panels
+            self.sound.wave(self.wave_arrivals(page))
         if self.project and self.stack.currentWidget() == self.pages["Projects"] and self.work_panel.isVisible():
             self.open_project(self.project, preserve_context=True)
         else:
             self.load_projects()
 
+    def wave_arrivals(self, page):
+        """When the wave reaches each piece of artwork: cards are placed by their
+        x position (the grid plays like a keyboard); list rows climb the scale."""
+        arrivals = []
+        for grid in page.findChildren(GridCards):
+            if grid.isVisible():
+                for index, rect in grid.card_rects().items():
+                    lag = grid.refresh_lags.get(grid.entries[index].get('path'))
+                    if lag is not None:
+                        arrivals.append((lag, self.screen_x(grid, rect.center().toPoint()), None))
+        rows = sorted(lag for rows in page.findChildren(FileList) if rows.isVisible() for lag in rows.refresh_lags.values())
+        arrivals += [(lag, 0.0, n) for n, lag in enumerate(rows[:7])]
+        return arrivals
+
     def error(self, message):
+        self.sound.play('alert')
         self.status.setText(message[:150])
         QMessageBox.warning(self, "Neotrix Prism", message)
 
     def closeEvent(self, event):
+        if hasattr(self,'updates') and not self.jobs and not self.updates.can_close():
+            event.ignore()
+            if self.updates.task and self.updates.task.isRunning():
+                QTimer.singleShot(150,self,self.close)
+            return
         if self.jobs:
+            self._closing = True
             self.cancel_jobs()
             event.ignore()
             QTimer.singleShot(150, self.close)
         else:
+            self.sound.shutdown()
             event.accept()
 
     def showEvent(self, event):
@@ -1438,9 +1653,11 @@ class MainWindow(QMainWindow):
         """Opening sequence: light rises, the chrome drops in, the title types
         on, content cascades and the orb lands last as the call to action."""
         current = next((n for n, b in self.nav.items() if b.isChecked()), "Projects")
+        self.sound.prepare()
         if not enabled(self):
             QTimer.singleShot(0, self, lambda: self.move_selection(current))
             return
+        self.sound.play('intro')
         self.surface.play_intro()
         for art in self.sidebar.findChildren(MotionIcon):
             art.appear(60)
@@ -1469,6 +1686,7 @@ class MainWindow(QMainWindow):
                 self.orb.spin.stop()
             else:
                 self.orb.set_busy(bool(self.jobs))
+            self.progress_bar.pause(self.isMinimized())
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

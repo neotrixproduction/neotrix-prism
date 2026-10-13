@@ -57,7 +57,7 @@ def test_stage_readonly_and_inheritance(project,monkeypatch):
 def test_variant_recipe_and_stage_inference(project):
     shot='03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/'
     paths={'03_PRODUCTION/WORK/3D/ASSETS/projects/NTX_Vertical_0010_v001.blend':('modelling','Vertical'),
-           shot+'PROJECTS/NTX_Vertical_0010_v002.blend':('unassigned','Vertical'),
+           shot+'PROJECTS/NTX_Vertical_0010_v002.blend':('other','Vertical'),
            shot+'COMPOSITING/projects/NTX_Vertical_0010_v003.aep':('compositing','Vertical'),
            '03_PRODUCTION/WORK/GRAPHIC_DESIGN/projects/NTX_Summer_v001.ai':('other','Summer')}
     # The template's shot stage folders: SHOTS/<shot>/PROJECTS/<STAGE>.

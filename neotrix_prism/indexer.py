@@ -10,6 +10,10 @@ EXTENSIONS = {".blend": "Blender", ".ai": "Illustrator", ".psd": "Photoshop",
               ".psb": "Photoshop", ".aep": "After Effects", ".aepx": "After Effects", ".comp": "Fusion"}
 MEDIA = {".png": "Image", ".jpg": "Image", ".jpeg": "Image", ".exr": "Image", ".tif": "Image", ".tiff": "Image",
          ".mp4": "Video", ".mov": "Video", ".mkv": "Video", ".wav": "Audio", ".mp3": "Audio"}
+MEDIA.update({'.webp':'Image','.gif':'Image','.avif':'Image','.svg':'Image',
+              '.flac':'Audio','.ogg':'Audio','.m4a':'Audio'})
+AI_DOCUMENTS = {'.json':'Workflow','.yaml':'Workflow','.yml':'Workflow','.toml':'Workflow',
+                '.txt':'Prompt','.md':'Prompt','.prompt':'Prompt','.zip':'Archive','.7z':'Archive','.tar':'Archive','.gz':'Archive'}
 OUTPUT_DIRS = {"exports", "export", "renders", "render", "playblasts", "05_delivery", "delivery"}
 SKIP = {"node_modules", "__pycache__", "$recycle.bin", "#recycle", "system volume information",
         "_shot_template", "_neotrix_prism", "auto-save", "autosave", "adobe after effects auto-save",
@@ -22,6 +26,29 @@ STAGES = {"Preproduction": ("preproduction", "preprod", "storyboard", "animatic"
           "Post": ("post", "compositing", "comp", "finishing"), "Delivery": ("delivery", "final", "approved")}
 DEPARTMENTS = {"3D": "3D", "GRAPHIC_DESIGN": "Graphic Design", "MOTION_GRAPHICS": "Motion Graphics",
                "AI_GENERATION": "AI Generation", "04_POST": "Post", "02_PREPRODUCTION": "Preproduction"}
+WORK_AREAS = {'3d': '3D', 'graphic_design': 'Graphic Design',
+              'motion_graphics': 'Motion Graphic', 'ai_generation': 'AI Generation', 'other': 'Other work'}
+AI_COLLECTIONS = {'inputs': 'Inputs', 'workflows': 'Prompts & workflows', 'outputs': 'Generated outputs',
+                  'handoff_archives': 'Handoff archives', 'other': 'Other AI files'}
+AI_EXTENSIONS = set(EXTENSIONS) | set(MEDIA) | {'.webp','.gif','.avif','.svg','.pdf','.flac','.ogg',
+    '.m4a','.json','.txt','.md','.yaml','.yml','.toml','.csv','.prompt','.zip','.7z','.tar','.gz'}
+
+
+def work_area(file):
+    parts = file['relative'].replace('\\', '/').lower().split('/')[:-1]
+    for i in range(len(parts)-2):
+        if parts[i:i+2] == ['03_production', 'work']:
+            return parts[i+2] if parts[i+2] in WORK_AREAS else 'other'
+    return 'other'
+
+
+def ai_collection(file):
+    parts = file['relative'].replace('\\', '/').lower().split('/')[:-1]
+    if 'ai_generation' not in parts:
+        return None
+    index = parts.index('ai_generation') + 1
+    key = parts[index] if index < len(parts) else 'other'
+    return key if key in AI_COLLECTIONS else 'other'
 
 
 def natural(text):
@@ -64,7 +91,7 @@ def preview_group(file):
 def in_section(file, section):
     client = asset_category(file) is not None
     if section == 'assets':return client
-    if section == 'preview':return not client and not is_asset(file) and file.get('kind', 'working') == 'output' and Path(file['name']).suffix.lower() in ('.mp4','.mov')
+    if section == 'preview':return not client and not is_asset(file) and ai_collection(file) in (None,'outputs') and file.get('kind', 'working') == 'output' and Path(file['name']).suffix.lower() in ('.mp4','.mov')
     return not client
 
 
@@ -109,14 +136,14 @@ def parse(path, project):
         if match:
             variant = match[1]
     preview = None
-    for suffix in (".png", ".jpg", ".jpeg"):
+    for suffix in (".png", ".jpg", ".jpeg", ".webp"):
         candidate = path.with_suffix(suffix)
         if candidate.exists() and candidate.stat().st_size < 10 * 1024 * 1024:
             preview = str(candidate)
             break
     return {"path": str(path), "relative": str(relative), "name": path.name, "project": project.name,
-            "application": EXTENSIONS.get(path.suffix.lower(), MEDIA.get(path.suffix.lower(), "File")), "department": department, "variant": variant,
-            "kind": "output" if path.suffix.lower() in MEDIA or any(p.lower() in OUTPUT_DIRS for p in parts[:-1]) else "working",
+            "application": EXTENSIONS.get(path.suffix.lower(), MEDIA.get(path.suffix.lower(), AI_DOCUMENTS.get(path.suffix.lower(),"File") if work_area({'relative':str(relative)})=='ai_generation' else "File")), "department": department, "variant": variant,
+            "kind": "output" if ai_collection({'relative':str(relative)})=='outputs' or path.suffix.lower() in MEDIA or any(p.lower() in OUTPUT_DIRS for p in parts[:-1]) else "working",
             "shot": shot, "stage": stage, "version": version, "size": stat.st_size,
             "modified": stat.st_mtime, "preview": preview}
 
@@ -149,7 +176,8 @@ def scan(project, cancel=None, progress=None):
             path = Path(directory, name)
             scope = {'relative': str(path.relative_to(project))}
             asset_path = is_asset(scope) or asset_category(scope) is not None
-            if name.startswith('.') or path.is_symlink() or (not asset_path and path.suffix.lower() not in EXTENSIONS
+            ai_path = work_area(scope) == 'ai_generation' and path.suffix.lower() in AI_EXTENSIONS
+            if name.startswith('.') or path.is_symlink() or (not asset_path and not ai_path and path.suffix.lower() not in EXTENSIONS
                and not (path.suffix.lower() in MEDIA and any(p.lower() in OUTPUT_DIRS for p in path.relative_to(project).parts[:-1]))):
                 continue
             if re.search(r"(?i)auto[- ]?save|(?:^|[_. -])(?:tmp|temp|backup)(?:[_. -]|$)", name):

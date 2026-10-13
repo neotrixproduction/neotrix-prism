@@ -34,19 +34,31 @@ def test_parallel_append_and_corrupt_record(tmp_path):
 
 
 def test_dialog_append_refresh_and_validation(tmp_path, monkeypatch):
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QLabel
+    from PySide6.QtTest import QTest
     from neotrix_prism.comment_dialog import CommentDialog
     app = QApplication.instance() or QApplication([])
     file = tmp_path / 'scene.comp'
     file.touch()
     dialog = CommentDialog(str(file), application='Fusion')
+    def wait():
+        for _ in range(300):
+            app.processEvents()
+            if dialog.task is None or not dialog.task.isRunning():
+                QTest.qWait(20)
+                return
+            QTest.qWait(10)
+        raise AssertionError('Comment worker did not finish')
+    wait()
     dialog.append()
     assert 'Enter your name' in dialog.status.text()
     dialog.message.setPlainText('Team review')
     dialog.append()
-    assert 'Team review' in dialog.history.toPlainText()
+    wait()
+    assert any('Team review' in label.text() for label in dialog.history.findChildren(QLabel))
     assert dialog.message.toPlainText() == ''
     add_comment(file, 'Blender artist', 'Second review', 'Blender')
     dialog.refresh()
-    assert 'Second review' in dialog.history.toPlainText()
+    wait()
+    assert any('Second review' in label.text() for label in dialog.history.findChildren(QLabel))
     dialog.close()

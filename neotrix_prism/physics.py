@@ -269,6 +269,46 @@ def _bounce_settle():
 BOUNCE_MS = _bounce_settle()
 
 
+# Refresh ripple: a panel the wave passes under is pushed away from the orb,
+# rebounds through rest (about a third of the push), swings back once more
+# (about a tenth) and settles, like a raft riding a swell. An impulse into an
+# under-damped spring, normalised so the outward peak is 1 (~140 ms after the
+# front arrives); RIPPLE_SPEED is its launch speed, for velocity stretch.
+_RIPPLE = (.7, .34)
+
+
+def _ripple_gain():
+    peak, t = 0.0, 0.0
+    while t < 1.0:
+        peak = max(peak, sample(0.0, 1.0, t, *_RIPPLE)[0])
+        t += .002
+    return 1/peak
+
+
+_RIPPLE_GAIN = _ripple_gain()
+
+
+def _ripple_settle():
+    t, last = 0.0, 0.0
+    while t < 4.0:
+        x, v = sample(0.0, _RIPPLE_GAIN, t, *_RIPPLE)
+        if abs(x) > .006 or abs(v) > .06:
+            last = t
+        t += .008
+    return int(last*1000+8)
+
+
+RIPPLE_MS = _ripple_settle()
+RIPPLE_SPEED = _RIPPLE_GAIN
+
+
+def ripple(elapsed_ms):
+    """(displacement, velocity per second) of a panel the refresh wave crosses; 1 is the outward peak."""
+    if elapsed_ms <= 0 or elapsed_ms >= RIPPLE_MS:
+        return 0.0, 0.0
+    return sample(0.0, _RIPPLE_GAIN, elapsed_ms/1000, *_RIPPLE)
+
+
 def bounce(elapsed_ms):
     """(displacement, velocity per second) of the unit refresh bounce; -1 is the peak."""
     if elapsed_ms <= 0 or elapsed_ms >= BOUNCE_MS:

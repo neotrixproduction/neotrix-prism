@@ -21,6 +21,7 @@ internal static class Launcher {
             info.WorkingDirectory = root;
             info.UseShellExecute = false;
             info.CreateNoWindow = true;
+            info.EnvironmentVariables["NEOTRIX_LAUNCHER_PID"] = Process.GetCurrentProcess().Id.ToString();
             info.RedirectStandardOutput = check;
             info.RedirectStandardError = check;
             using (Process process = Process.Start(info)) {

@@ -129,6 +129,16 @@ remains available offline, while shared writes require connected writable storag
 
 ## Preview status
 
+The current development source adds separate work-area cards, expanded AI-file
+browsing, an updated comments window, interface sound and a [GitHub updater](docs/UPDATES.md).
+Favorites now use a separate per-user store, concurrent-save protection,
+automatic backups and a Restore favorites action. Disconnected files remain
+favorited. See the [maintenance instructions](docs/SETUP.md#maintenance).
+The downloadable 0.6.0 release and its screenshots predate those additions.
+
+The current source passed 96 automated tests and the bundled Python 3.13.7
+functional smoke check on 14 October 2026.
+
 Real open/save/reopen checks passed for Blender, Photoshop and After Effects;
 file-opening checks passed for Illustrator and standalone Fusion. Desktop scaling
 was reviewed at 100%, 150% and 200%.
