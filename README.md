@@ -5,7 +5,7 @@ A portable Windows workspace for creative projects, built on the open-source
 find client assets, open creative documents, save new working versions and review
 full-video or per-shot previews without reorganizing production files.
 
-**[Download the Windows 0.6.0 preview](https://github.com/neotrixproduction/neotrix-prism/releases/tag/v0.6.0-preview)** ·
+**[Download Neotrix Prism 0.6.5 for Windows](https://github.com/neotrixproduction/neotrix-prism/releases/tag/v0.6.5)** ·
 [Setup guide](START_HERE.md)
 
 ![Neotrix Prism 0.6 project library](docs/screenshots/0.6/project-library.png)
@@ -77,7 +77,7 @@ are included. [Capture details and reproduction](docs/screenshots/0.6/README.md)
 
 ## Run on Windows
 
-1. Download the ZIP from the [0.6.0 preview release](https://github.com/neotrixproduction/neotrix-prism/releases/tag/v0.6.0-preview).
+1. Download the ZIP from the [0.6.5 release](https://github.com/neotrixproduction/neotrix-prism/releases/tag/v0.6.5).
 2. Extract the **whole ZIP** to a stable local folder.
 3. Double-click **Neotrix Prism.exe**. Keep the runtime and assets beside it.
 4. Open Settings to check storage roots and creative application paths.
@@ -127,14 +127,17 @@ remains available offline, while shared writes require connected writable storag
 - [Refresh animation handoff](docs/REFRESH_ANIMATION.md)
 - [Application icon artwork and generation sources](assets/app-icons/SOURCE.json)
 
-## Preview status
+## Release status
 
-The current development source adds separate work-area cards, expanded AI-file
+The 0.6.5 release includes separate work-area cards, expanded AI-file
 browsing, an updated comments window, interface sound and a [GitHub updater](docs/UPDATES.md).
 Favorites now use a separate per-user store, concurrent-save protection,
 automatic backups and a Restore favorites action. Disconnected files remain
 favorited. See the [maintenance instructions](docs/SETUP.md#maintenance).
-The downloadable 0.6.0 release and its screenshots predate those additions.
+It also includes native grayscale FreeType text rendering with Manrope and clearer
+search placeholders. The screenshots above show the earlier 0.6.0 layout.
+The published 0.6.0 preview predates the updater: install 0.6.5 manually once,
+then use Settings → App updates for future releases.
 
 The current source passed 96 automated tests and the bundled Python 3.13.7
 functional smoke check on 14 October 2026.

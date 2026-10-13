@@ -1,6 +1,6 @@
 # Neotrix GitHub updates
 
-The development implementation adds **Settings → App updates**. Portable builds
+Version 0.6.5 includes **Settings → App updates**. Portable builds
 check the public `neotrixproduction/neotrix-prism` releases quietly after startup;
 an available update is announced in the workspace status. Checks never install
 anything automatically. Settings also provides a manual Check for updates action.
@@ -46,8 +46,8 @@ helper, and the launcher passes its PID to the app. Each GitHub release must att
 The installer is disabled in a source checkout or an older package without the
 portable manifest. It requires a writable installation parent and uses staging
 on the same volume. This protects local development edits and allows folder swaps.
-The existing 0.6.0 GitHub ZIP predates this updater; these changes require a new
-portable build and release before other PCs receive them.
+The published 0.6.0 GitHub ZIP predates this updater. Download and extract the
+0.6.5 release manually once; subsequent releases can use the in-app updater.
 
 Validated with mocked downloads/checksums, cancellation and hostile archive paths;
 real Windows helper tests cover successful replacement and failed-runtime rollback

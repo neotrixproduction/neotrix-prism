@@ -7,7 +7,7 @@ using System.Windows.Forms;
 [assembly: AssemblyDescription("Neotrix creative project workspace")]
 [assembly: AssemblyCompany("Neotrix")]
 [assembly: AssemblyProduct("Neotrix Prism")]
-[assembly: AssemblyVersion("0.6.0.0")]
+[assembly: AssemblyVersion("0.6.5.0")]
 internal static class Launcher {
     [STAThread] static int Main(string[] args) {
         string root = AppDomain.CurrentDomain.BaseDirectory;

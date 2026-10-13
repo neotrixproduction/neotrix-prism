@@ -12,6 +12,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtTest import QTest
 from neotrix_prism.storage import Settings
 from neotrix_prism.ui import MainWindow
+from neotrix_prism.typography import configure_renderer
 
 with tempfile.TemporaryDirectory(prefix='neotrix-runtime-audit-') as directory:
     root=Path(directory)
@@ -19,6 +20,7 @@ with tempfile.TemporaryDirectory(prefix='neotrix-runtime-audit-') as directory:
     project=root/'projects'/'Audit Project'
     project.mkdir(parents=True)
     (project/'Scene_v001.blend').write_bytes(b'indexing fixture; never opened in a creative app')
+    configure_renderer()
     app=QApplication.instance() or QApplication([])
     errors=[]
     sys.excepthook=lambda kind,value,trace:errors.append(str(value))

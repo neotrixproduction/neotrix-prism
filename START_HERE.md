@@ -5,6 +5,11 @@
 3. Open Settings and check storage roots and application executable paths.
 4. Optionally run **Create Desktop Shortcut.cmd** for a shortcut with the app icon.
 
+Version 0.6.5 includes **Settings → App updates** for downloading, verifying and
+installing future releases. The older 0.6.0 preview has no updater; install this
+release manually once. User preferences and production projects remain separate
+from the portable application folder.
+
 ## Installation requirements
 
 The explorer is portable: no Python, Qt or font installation, no administrator
