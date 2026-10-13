@@ -1,0 +1,29 @@
+{
+  "created": "2026-10-13",
+  "icons": [
+    {
+      "name": "fonts",
+      "file": "client-fonts.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: Neotrix Prism client asset category card icon. ONE premium original sculpted 3D object isolated with genuine transparent alpha. Matching icon family: glossy violet glass and enamel, electric cyan details, rose pink accent, pronounced solid extrusion about 20% width, smooth rounded substantial bevels, realistic ambient occlusion, controlled upper-left studio highlights. Nearly frontal camera 12 degrees above, 15 degrees left. Big simple readable silhouette with few coherent features, no clutter. Centered square composition occupying 72%, safe transparent margin all sides. No backdrop, checkerboard, ground plane, pedestal, label or watermark. Avoid flat vector graphics and generic yellow folders.\nSubject: two large thick freestanding sculpted letterforms capital A and lowercase a, side by side as one typographic font icon. Violet glass capital A and cyan enamel lowercase a with a subtle rose accent on the extruded sides. Text exactly 'Aa'; no other lettering."
+    },
+    {
+      "name": "logos",
+      "file": "client-logos.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: Neotrix Prism client asset category card icon. ONE premium original sculpted 3D object isolated with genuine transparent alpha. Matching icon family: glossy violet glass and enamel, electric cyan details, rose pink accent, pronounced solid extrusion about 20% width, smooth rounded substantial bevels, realistic ambient occlusion, controlled upper-left studio highlights. Nearly frontal camera 12 degrees above, 15 degrees left. Big simple readable silhouette with few coherent features, no clutter. Centered square composition occupying 72%, safe transparent margin all sides. No backdrop, checkerboard, ground plane, pedestal, label or watermark. Avoid flat vector graphics and generic yellow folders.\nSubject: one original abstract brand identity emblem, three thick rounded petal-like geometric loops interlocking into one compact recognizable sculptural mark, predominantly violet with cyan face inset and rose side highlights. No known brand logo, no letters, no background badge."
+    },
+    {
+      "name": "guide",
+      "file": "client-guide.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: Neotrix Prism client asset category card icon. ONE premium original sculpted 3D object isolated with genuine transparent alpha. Matching icon family: glossy violet glass and enamel, electric cyan details, rose pink accent, pronounced solid extrusion about 20% width, smooth rounded substantial bevels, realistic ambient occlusion, controlled upper-left studio highlights. Nearly frontal camera 12 degrees above, 15 degrees left. Big simple readable silhouette with few coherent features, no clutter. Centered square composition occupying 72%, safe transparent margin all sides. No backdrop, checkerboard, ground plane, pedestal, label or watermark. Avoid flat vector graphics and generic yellow folders.\nSubject: one substantial rounded closed design guidebook, rich violet glass cover, cyan spine and a raised simple rose compass/ruler emblem centered on the cover. Clearly a polished physical brand guide volume with layered page edges. No text or letters."
+    },
+    {
+      "name": "brief",
+      "file": "client-brief.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: Neotrix Prism client asset category card icon. ONE premium original sculpted 3D object isolated with genuine transparent alpha. Matching icon family: glossy violet glass and enamel, electric cyan details, rose pink accent, pronounced solid extrusion about 20% width, smooth rounded substantial bevels, realistic ambient occlusion, controlled upper-left studio highlights. Nearly frontal camera 12 degrees above, 15 degrees left. Big simple readable silhouette with few coherent features, no clutter. Centered square composition occupying 72%, safe transparent margin all sides. No backdrop, checkerboard, ground plane, pedestal, label or watermark. Avoid flat vector graphics and generic yellow folders.\nSubject: one thick violet rounded clipboard holding one white-lavender sculpted sheet, cyan rounded top clip and three broad raised rose instruction lines plus one small cyan check mark. One coherent minimal briefing document object, no words or lettering."
+    }
+  ]
+}

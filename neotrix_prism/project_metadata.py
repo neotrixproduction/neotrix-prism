@@ -4,22 +4,49 @@ import hashlib
 from pathlib import Path
 from .storage import atomic_json, read_json, fingerprint, exclusive_lock, user_dir
 
-STAGES = {'modelling': 'Modelling', 'layout': 'Layout', 'lighting': 'Lighting',
-          'compositing': 'Compositing', 'other': 'Other work', 'unassigned': 'Unassigned'}
+# Shot stages in template order (03_PRODUCTION/WORK/3D/SHOTS/<shot>/PROJECTS/<STAGE>).
+# 'other' keeps its key so existing shared assignments remain valid; its folder is OTHERS.
+STAGES = {'modelling': 'Modelling', 'rigging': 'Rigging', 'layout': 'Layout', 'animation': 'Animation',
+          'fx': 'FX', 'lighting': 'Lighting', 'compositing': 'Compositing', 'other': 'Others',
+          'unassigned': 'Unassigned'}
+STAGE_NOTES = {'modelling': 'Shot-specific modelling and geometry work.',
+               'rigging': 'Shot-specific rigs, controls and deformation setup.',
+               'layout': 'Shot cameras, composition, staging and rough timing.',
+               'animation': 'Shot character, object and camera animation.',
+               'fx': 'Editable shot simulation and effects setups.',
+               'lighting': 'Shot lighting, materials, look development and render setup.',
+               'compositing': 'Editable shot composites of renders, footage and effects.',
+               'other': 'Other editable shot work that does not fit a named stage.',
+               'unassigned': 'General saves kept directly in the shot PROJECTS folder.'}
+# Stage folder names directly under a shot's PROJECTS folder.
+STAGE_FOLDERS = {'modelling': 'modelling', 'modeling': 'modelling', 'rigging': 'rigging', 'layout': 'layout',
+                 'animation': 'animation', 'fx': 'fx', 'lighting': 'lighting', 'compositing': 'compositing',
+                 'others': 'other', 'other': 'other'}
+ALL_STAGES = 'all'
 
 
 def inferred_stage(file):
     parts = file['relative'].replace('\\', '/').lower().split('/')[:-1]
+    for index, part in enumerate(parts[:-1]):
+        if part == 'projects' and parts[index+1] in STAGE_FOLDERS:
+            return STAGE_FOLDERS[parts[index+1]]
     if 'compositing' in parts:
         return 'compositing'
     if '3d' in parts and 'assets' in parts and 'projects' in parts:
         return 'modelling'
     if '3d' in parts and 'shots' in parts and 'projects' in parts:
         return 'unassigned'
-    aliases = {'Modeling': 'modelling', 'Layout': 'layout', 'Lighting': 'lighting', 'Post': 'compositing'}
+    aliases = {'Modeling': 'modelling', 'Rigging': 'rigging', 'Layout': 'layout', 'Animation': 'animation',
+               'FX': 'fx', 'Lighting': 'lighting', 'Post': 'compositing'}
     if file.get('stage') in aliases and file.get('department') != 'Post':
         return aliases[file['stage']]
     return 'unassigned' if file.get('stage') == 'Unspecified' and file.get('department') == '3D' else 'other'
+
+
+def stage_folder(file):
+    """The folder a file sits in, one level above it (e.g. LIGHTING), for the all-stages view."""
+    parts = file['relative'].replace('\\', '/').split('/')
+    return parts[-2] if len(parts) > 1 else ''
 
 
 class StageStore:
@@ -44,9 +71,9 @@ class StageStore:
                     raise OSError('Project storage is unavailable.')
                 data = None
             document = json.loads(data) if data is not None else {'format': 1, 'assignments': {}}
-            if document.get('format') != 1 or not isinstance(document.get('assignments'), dict):
+            if not isinstance(document, dict) or document.get('format') != 1 or not isinstance(document.get('assignments'), dict):
                 raise ValueError('Unsupported stage-label document. Reload or contact your project administrator.')
-            if any(v not in STAGES or Path(k).is_absolute() or '..' in k.replace('\\','/').split('/')
+            if any(not isinstance(v, str) or v not in STAGES or Path(k).is_absolute() or '..' in k.replace('\\','/').split('/')
                    for k,v in document['assignments'].items()):
                 raise ValueError('Invalid project-relative stage assignment.')
             check = self.path if self.path.exists() else self.project

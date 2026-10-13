@@ -79,3 +79,36 @@ def test_save_inherits_shared_stage_only_after_success(tmp_path, monkeypatch):
     assert save_version_dialog(core) is None
     assert 'Shot_v003.psd' not in store.load()['assignments']
     assert warnings
+
+
+def test_never_saved_document_requires_destination_and_can_cancel(tmp_path, monkeypatch):
+    app=QApplication.instance() or QApplication([])
+    monkeypatch.setenv('NEOTRIX_USER_DIR',str(tmp_path/'prefs'))
+    adapter=Adapter('')
+    core=SimpleNamespace(appPlugin=adapter,requestedApp='Photoshop')
+    monkeypatch.setattr(QFileDialog,'getSaveFileName',lambda *args:('', ''))
+    assert save_version_dialog(core) is None and not adapter.saved
+    monkeypatch.setattr(QFileDialog,'getSaveFileName',lambda *args:(str(tmp_path/'First'), ''))
+    monkeypatch.setattr(QMessageBox,'question',lambda *args:QMessageBox.Save)
+    saved=save_version_dialog(core)
+    assert saved.name=='First_v001.psd'
+    assert saved.read_bytes()==b'unsaved document state'
+    assert adapter.current==str(saved).replace('\\','/')
+
+
+def test_new_collision_after_preview_preserves_other_artists_file(tmp_path, monkeypatch):
+    app=QApplication.instance() or QApplication([])
+    monkeypatch.setenv('NEOTRIX_USER_DIR',str(tmp_path/'prefs'))
+    source=tmp_path/'Work_v001.psd';source.write_bytes(b'original')
+    adapter=Adapter(str(source))
+    core=SimpleNamespace(appPlugin=adapter,requestedApp='Photoshop')
+    warnings=[]
+    def confirm(*args):
+        (tmp_path/'Work_v002.psd').write_bytes(b'other artist')
+        return QMessageBox.Save
+    monkeypatch.setattr(QMessageBox,'question',confirm)
+    monkeypatch.setattr(QMessageBox,'warning',lambda *args:warnings.append(args[2]))
+    assert save_version_dialog(core) is None
+    assert not adapter.saved
+    assert (tmp_path/'Work_v002.psd').read_bytes()==b'other artist'
+    assert 'after the preview' in warnings[0]

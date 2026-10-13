@@ -1,0 +1,31 @@
+{
+  "created": "2026-10-13",
+  "role": "Monochrome sidebar navigation. Separate from colorful project/stage/app artwork.",
+  "reference": "https://macpaw.com/cleanmymac",
+  "icons": [
+    {
+      "name": "projects",
+      "file": "projects.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: small monochrome navigation icon for Neotrix Prism, a premium desktop application. Generate ONE original icon isolated on a genuinely transparent background. All material is a SINGLE neutral pearl-white hue with extremely faint lavender in the shadows; absolutely no rainbow, pink, cyan, green, gold, multicolor, saturated color or colored badge. CleanMyMac-style restrained small sidebar symbol: sculpted rounded silhouette, subtle solid thickness and soft bevel, satin pearl finish, modest upper-left highlight and gentle ambient occlusion. Nearly frontal, only 8 degrees above and 10 degrees left. Designed to remain readable at 24 pixels, simple silhouette with few clear large features, not a detailed ornamental illustration. No surrounding square badge, no pedestal, no ground, no cast shadow outside silhouette, no letters or words, no checkerboard. Square transparent canvas, artwork centered and occupying 78% of canvas, safe transparent margins. Same quiet material, camera, lighting and visual weight across all four navigation icons.\nSubject: a compact upright creative project prism made from three interlocking chunky rounded tiles forming one cohesive abstract hub. One neutral pearl-white material everywhere. Not a folder, no floating colored confetti or tiny satellite objects."
+    },
+    {
+      "name": "favorites",
+      "file": "favorites.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: small monochrome navigation icon for Neotrix Prism, a premium desktop application. Generate ONE original icon isolated on a genuinely transparent background. All material is a SINGLE neutral pearl-white hue with extremely faint lavender in the shadows; absolutely no rainbow, pink, cyan, green, gold, multicolor, saturated color or colored badge. CleanMyMac-style restrained small sidebar symbol: sculpted rounded silhouette, subtle solid thickness and soft bevel, satin pearl finish, modest upper-left highlight and gentle ambient occlusion. Nearly frontal, only 8 degrees above and 10 degrees left. Designed to remain readable at 24 pixels, simple silhouette with few clear large features, not a detailed ornamental illustration. No surrounding square badge, no pedestal, no ground, no cast shadow outside silhouette, no letters or words, no checkerboard. Square transparent canvas, artwork centered and occupying 78% of canvas, safe transparent margins. Same quiet material, camera, lighting and visual weight across all four navigation icons.\nSubject: one softly beveled solid five-point star, gently rounded tips and substantial sculpted pearl-white thickness. Simple elegant single silhouette."
+    },
+    {
+      "name": "activity",
+      "file": "activity.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: small monochrome navigation icon for Neotrix Prism, a premium desktop application. Generate ONE original icon isolated on a genuinely transparent background. All material is a SINGLE neutral pearl-white hue with extremely faint lavender in the shadows; absolutely no rainbow, pink, cyan, green, gold, multicolor, saturated color or colored badge. CleanMyMac-style restrained small sidebar symbol: sculpted rounded silhouette, subtle solid thickness and soft bevel, satin pearl finish, modest upper-left highlight and gentle ambient occlusion. Nearly frontal, only 8 degrees above and 10 degrees left. Designed to remain readable at 24 pixels, simple silhouette with few clear large features, not a detailed ornamental illustration. No surrounding square badge, no pedestal, no ground, no cast shadow outside silhouette, no letters or words, no checkerboard. Square transparent canvas, artwork centered and occupying 78% of canvas, safe transparent margins. Same quiet material, camera, lighting and visual weight across all four navigation icons.\nSubject: one single continuous thick rounded pulse waveform with two clearly readable peaks, subtle sculpted pearl-white depth. The waveform itself is the icon, not placed inside a tile or circle."
+    },
+    {
+      "name": "settings",
+      "file": "settings.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: small monochrome navigation icon for Neotrix Prism, a premium desktop application. Generate ONE original icon isolated on a genuinely transparent background. All material is a SINGLE neutral pearl-white hue with extremely faint lavender in the shadows; absolutely no rainbow, pink, cyan, green, gold, multicolor, saturated color or colored badge. CleanMyMac-style restrained small sidebar symbol: sculpted rounded silhouette, subtle solid thickness and soft bevel, satin pearl finish, modest upper-left highlight and gentle ambient occlusion. Nearly frontal, only 8 degrees above and 10 degrees left. Designed to remain readable at 24 pixels, simple silhouette with few clear large features, not a detailed ornamental illustration. No surrounding square badge, no pedestal, no ground, no cast shadow outside silhouette, no letters or words, no checkerboard. Square transparent canvas, artwork centered and occupying 78% of canvas, safe transparent margins. Same quiet material, camera, lighting and visual weight across all four navigation icons.\nSubject: one solid pearl-white rounded six-tooth cog with one large central circular opening, smooth sculpted thickness, simple clean readable silhouette, no square badge."
+    }
+  ]
+}

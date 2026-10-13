@@ -55,15 +55,21 @@ def test_stage_readonly_and_inheritance(project,monkeypatch):
 
 
 def test_variant_recipe_and_stage_inference(project):
-    paths={'03_PRODUCTION/WORK/3D/ASSETS/projects/NTX_Vertical_0010_v001.blend':'modelling',
-           '03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/PROJECTS/NTX_Vertical_0010_v002.blend':'unassigned',
-           '03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/COMPOSITING/projects/NTX_Vertical_0010_v003.aep':'compositing',
-           '03_PRODUCTION/WORK/GRAPHIC_DESIGN/projects/NTX_Summer_v001.ai':'other'}
-    for relative,expected in paths.items():
+    shot='03_PRODUCTION/WORK/3D/SHOTS/NTX_Vertical_0010/'
+    paths={'03_PRODUCTION/WORK/3D/ASSETS/projects/NTX_Vertical_0010_v001.blend':('modelling','Vertical'),
+           shot+'PROJECTS/NTX_Vertical_0010_v002.blend':('unassigned','Vertical'),
+           shot+'COMPOSITING/projects/NTX_Vertical_0010_v003.aep':('compositing','Vertical'),
+           '03_PRODUCTION/WORK/GRAPHIC_DESIGN/projects/NTX_Summer_v001.ai':('other','Summer')}
+    # The template's shot stage folders: SHOTS/<shot>/PROJECTS/<STAGE>.
+    for folder,stage in (('MODELLING','modelling'),('RIGGING','rigging'),('LAYOUT','layout'),
+                         ('ANIMATION','animation'),('FX','fx'),('LIGHTING','lighting'),
+                         ('COMPOSITING','compositing'),('OTHERS','other')):
+        paths[shot+f'PROJECTS/{folder}/NTX_Vertical_0010_v010.blend']=(stage,'Vertical')
+    for relative,(expected,variant) in paths.items():
         path=project/relative;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'fixture')
         file=indexer.parse(path,project)
-        assert inferred_stage(file)==expected
-        assert file['variant']==('Summer' if expected=='other' else 'Vertical')
+        assert inferred_stage(file)==expected,relative
+        assert file['variant']==variant
 
 
 def test_icon_candidates_fallback_and_cache(project,monkeypatch,tmp_path):
@@ -78,13 +84,15 @@ def test_icon_candidates_fallback_and_cache(project,monkeypatch,tmp_path):
     assert QImage(str(cache)).pixelColor(20,20)==QColor('#ff0000')
     (icons/'project.png').write_bytes(b'corrupt')
     image.fill(QColor('#0000ff'));image.save(str(template/'project.png'))
-    project_browser.read_icon(project,cache)
-    assert QImage(str(cache)).pixelColor(20,20)==QColor('#0000ff')
-    assert project_browser.read_icon(tmp_path/'disconnected-project',cache)==str(cache)
-    (template/'project.png').unlink()
+    fallback = project_browser.read_icon(project,cache)
+    assert fallback == project_browser.themed_artwork(project)
+    assert not cache.exists()  # Template art is not custom artwork; name-based art wins.
+    image.fill(QColor('#ff0000'));image.save(str(icons/'project.png'))
     assert project_browser.read_icon(project,cache)==str(cache)
-    cache.unlink()
-    assert project_browser.read_icon(project,cache).endswith('project-placeholder.png')
+    assert project_browser.read_icon(tmp_path/'disconnected-project',cache)==str(cache)
+    (icons/'project.png').unlink()
+    assert project_browser.read_icon(project,cache)==project_browser.themed_artwork(project)
+    assert not cache.exists()
     (icons/'project.svg').write_text('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#00ff00"/></svg>')
     assert project_browser.read_icon(project,cache)==str(cache)
     assert QImage(str(cache)).pixelColor(20,20)==QColor('#00ff00')

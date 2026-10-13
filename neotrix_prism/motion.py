@@ -1,12 +1,23 @@
-"""Interaction-driven Qt motion. Timelines stop when settled or motion is reduced."""
-from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QSize, QTimer, QPointF
-from PySide6.QtGui import QPainter, QColor, QPen, QLinearGradient, QRadialGradient, QPainterPath
-from PySide6.QtWidgets import QPushButton, QWidget, QStylePainter, QStyleOptionButton, QStyle, QGraphicsEffect
+"""Interaction-driven Qt motion. Springs keep their velocity across interruptions,
+every effect settles at rest, and reduced motion snaps straight to the end state."""
+import math
+from PySide6.QtCore import Qt, QVariantAnimation, QEasingCurve, QRectF, QSize, QPointF, QPoint
+from PySide6.QtGui import QPainter, QColor, QPen, QLinearGradient, QRadialGradient, QConicalGradient, QPainterPath, QIcon
+from PySide6.QtWidgets import (QPushButton, QWidget, QStylePainter, QStyleOptionButton, QStyle, QGraphicsEffect,
+                               QScrollArea, QSplitter, QSplitterHandle)
+from . import physics
+from .physics import SNAPPY, POP, FLUID
 
 
 def enabled(widget):
-    settings = getattr(widget.window(), "settings", None)
+    window = widget.window() if hasattr(widget, 'window') else None
+    settings = getattr(window, "settings", None)
     return not (settings and settings.data.get("reduced_motion", False))
+
+
+def snap(value, dpr=1.0):
+    """Pixel-aligned translation keeps native glyphs crisp while they travel."""
+    return round(value*dpr)/dpr
 
 
 def tween(owner, key, start, end, update, duration=220, curve=QEasingCurve.OutCubic):
@@ -29,19 +40,102 @@ def tween(owner, key, start, end, update, duration=220, curve=QEasingCurve.OutCu
     return animation
 
 
+def spring(owner, key, target, update, value=None, velocity=None, feel=FLUID, delay=0, precision=None, done=None):
+    """Physics-driven motion that retargets without losing momentum."""
+    if not enabled(owner):
+        physics.cancel(owner, key)
+        update(target)
+        if done:
+            done()
+        return None
+    return physics.animate(owner, key, target, update, value, velocity, feel, delay, precision, done)
+
+
+def clock(owner, key, duration, update, done=None):
+    """A linear millisecond clock for painters that sample many staggered springs.
+
+    Linear time does not mean linear motion: each sampled trajectory is a spring.
+    """
+    animation = tween(owner, key, 0.0, float(duration), update, max(1, int(duration)), QEasingCurve.Linear)
+    if done:
+        if animation:
+            animation.finished.connect(done)
+        else:
+            done()
+    return animation
+
+
+def refresh_motion(elapsed, delay, amplitude):
+    """(offset, vertical stretch, tilt) of artwork riding the refresh wave.
+
+    Stretch follows speed and squash follows the landing, so artwork reads as
+    having weight rather than sliding on a curve.
+    """
+    if delay is None or elapsed < 0:
+        return 0.0, 1.0, 0.0
+    displacement, velocity = physics.bounce(elapsed-delay)
+    if not displacement and not velocity:
+        return 0.0, 1.0, 0.0
+    stretch = min(.09, abs(velocity)*.006)-min(.08, max(0.0, displacement)*.32)
+    return displacement*amplitude, 1+stretch, velocity*.22
+
+
 class MotionButton(QPushButton):
     def __init__(self, text="", parent=None):
         super().__init__(text, parent)
-        self.hover = self.press = 0.0
+        self.hover = self.press = self.pop = 0.0
+        self.turn = 1.0
+        self.reveal = 1.0
         self.ripple = 1.0
         self.ripple_origin = QPointF()
+        self.bob = self.tilt = 0.0
+        self.stretch = 1.0
         self.setCursor(Qt.PointingHandCursor)
         self.pressed.connect(lambda: self.animate_press(1.0))
         self.released.connect(lambda: self.animate_press(0.0))
 
     def animate_press(self, target):
-        tween(self, "_press", self.press, target, self.set_press, 140 if target else 280,
-              QEasingCurve.OutCubic if target else QEasingCurve.OutBack)
+        # A firm press, then a jelly release that briefly swells past rest.
+        spring(self, 'press', target, self.set_press, value=self.press,
+               feel=(.15, .9) if target else (.34, .45))
+
+    def refresh_wave(self, delay=0):
+        if not enabled(self):
+            return
+        def step(elapsed):
+            self.bob, self.stretch, self.tilt = refresh_motion(elapsed, delay, 7)
+            self.update()
+        clock(self, '_bob', delay+physics.BOUNCE_MS, step, self.reset_wave)
+
+    def reset_wave(self):
+        animation = getattr(self, '_bob', None)
+        if animation:
+            animation.stop()
+        self.bob, self.stretch, self.tilt = 0.0, 1.0, 0.0
+        self.update()
+
+    def hop(self):
+        """Selection feedback: the icon jumps and turns a full revolution in 3D."""
+        spring(self, 'pop', 0.0, self.set_pop, value=self.pop, velocity=11, feel=POP)
+        def turn(value):
+            self.turn = float(value)
+            self.update()
+        spring(self, 'turn', 1.0, turn, value=0.0, feel=(.62, .62))
+
+    def intro(self, delay=0):
+        if not enabled(self):
+            return
+        self.reveal = 0.0
+        self.update()
+        spring(self, 'reveal', 1.0, self.set_reveal, value=0.0, feel=POP, delay=delay)
+
+    def set_pop(self, value):
+        self.pop = float(value)
+        self.update()
+
+    def set_reveal(self, value):
+        self.reveal = float(value)
+        self.update()
 
     def set_press(self, value):
         self.press = float(value)
@@ -56,42 +150,58 @@ class MotionButton(QPushButton):
         def advance(value):
             self.ripple = float(value)
             self.update()
-        tween(self, '_ripple', 0.0, 1.0, advance, 580)
+        tween(self, '_ripple', 0.0, 1.0, advance, 620, QEasingCurve.OutCubic)
         super().mousePressEvent(event)
 
     def enterEvent(self, event):
-        tween(self, "_hover", self.hover, 1.0, self.set_hover, 220)
+        spring(self, 'hover', 1.0, self.set_hover, value=self.hover, feel=SNAPPY)
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        tween(self, "_hover", self.hover, 0.0, self.set_hover, 260)
+        spring(self, 'hover', 0.0, self.set_hover, value=self.hover, feel=(.4, 1.0))
         super().leaveEvent(event)
+
+    def paint_artwork(self, p, artwork, size):
+        # Icon-only controls paint their artwork in perspective with float
+        # transforms, so lift, turn and squash glide instead of stepping.
+        from . import art3d
+        reveal = max(0.0, min(1.0, self.reveal))
+        hover = max(0.0, self.hover)
+        lift = -2.5*hover-5*self.pop+self.bob-14*(1-self.reveal)
+        scale = 1+.1*hover-.08*self.press+.16*self.pop
+        mode = QIcon.Normal if self.isEnabled() else QIcon.Disabled
+        state = QIcon.On if self.isChecked() else QIcon.Off
+        pixmap = artwork.pixmap(size, self.devicePixelRatioF(), mode, state)
+        art3d.paint(p, pixmap, QPointF(self.width()/2, self.height()/2), size.width(),
+                    yaw=360*(1-self.turn)-14*hover, pitch=6*hover, roll=self.tilt-7*self.pop,
+                    scale=scale, stretch=self.stretch, opacity=reveal, lift=lift)
 
     def paintEvent(self, event):
         option = QStyleOptionButton()
         self.initStyleOption(option)
         p = QStylePainter(self)
-        scale = 1 - .035 * self.press
-        p.translate(self.width() / 2, self.height() / 2)
-        p.scale(scale, scale)
-        p.translate(-self.width() / 2, -self.height() / 2)
-        if not option.icon.isNull():
-            size = self.iconSize()
-            option.iconSize = QSize(int(size.width() * (1 + .12 * self.hover)), int(size.height() * (1 + .12 * self.hover)))
+        # Copy first: PySide exposes option.icon by reference into the option.
+        artwork = QIcon(option.icon) if not self.text() and not option.icon.isNull() else None
+        if artwork is not None:
+            option.icon = QIcon()
         p.drawControl(QStyle.CE_PushButton, option)
-        if self.hover > .01 and self.isEnabled():
+        if artwork is not None:
+            self.paint_artwork(p, artwork, QSize(self.iconSize()))
+        hover = max(0.0, min(1.0, self.hover))
+        if hover > .01 and self.isEnabled():
             p.setRenderHint(QPainter.Antialiasing)
-            p.setBrush(QColor(255, 230, 255, int(14 * self.hover)))
-            p.setPen(QPen(QColor(244, 185, 255, int(110 * self.hover)), 1.2))
-            p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 11, 11)
+            p.setBrush(QColor(255, 255, 255, int(12*hover)))
+            p.setPen(QPen(QColor(255, 255, 255, int(78*hover)), 1.1))
+            p.drawRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 12, 12)
         if enabled(self) and 0 < self.ripple < 1:
             clip = QPainterPath()
-            clip.addRoundedRect(QRectF(self.rect()).adjusted(1,1,-1,-1),11,11)
+            clip.addRoundedRect(QRectF(self.rect()).adjusted(1, 1, -1, -1), 12, 12)
             p.setClipPath(clip)
-            radius = max(self.width(),self.height())*self.ripple
-            p.setPen(QPen(QColor(255,230,255,int(130*(1-self.ripple))),1.5))
-            p.setBrush(QColor(255,230,255,int(25*(1-self.ripple))))
-            p.drawEllipse(self.ripple_origin,radius,radius)
+            radius = max(self.width(), self.height())*1.15*self.ripple
+            fade = (1-self.ripple)**1.4
+            p.setPen(QPen(QColor(255, 255, 255, int(120*fade)), 1.4))
+            p.setBrush(QColor(255, 255, 255, int(30*fade)))
+            p.drawEllipse(self.ripple_origin, radius, radius)
 
 
 class MotionIcon(QWidget):
@@ -99,6 +209,9 @@ class MotionIcon(QWidget):
         super().__init__()
         self.name, self.hover, self.reveal = name, 0.0, 1.0
         self.pointer = QPointF()
+        self.artwork = None
+        self.bob = self.tilt = 0.0
+        self.stretch = 1.0
         self.setFixedSize(size, size)
         self.setAttribute(Qt.WA_TransparentForMouseEvents)
 
@@ -106,8 +219,28 @@ class MotionIcon(QWidget):
         self.hover = float(value)
         self.update()
 
+    def set_artwork(self, path):
+        self.artwork = QIcon(path)
+        self.update()
+
+    def refresh_wave(self, delay=0):
+        if not enabled(self):
+            return
+        amplitude = min(24, self.height()*.14)
+        def step(elapsed):
+            self.bob, self.stretch, self.tilt = refresh_motion(elapsed, delay, amplitude)
+            self.update()
+        clock(self, '_bob', delay+physics.BOUNCE_MS, step, self.reset_wave)
+
+    def reset_wave(self):
+        animation = getattr(self, '_bob', None)
+        if animation:
+            animation.stop()
+        self.bob, self.stretch, self.tilt = 0.0, 1.0, 0.0
+        self.update()
+
     def engage(self, target):
-        tween(self, "_hover", self.hover, target, self.set_hover, 480, QEasingCurve.OutBack)
+        spring(self, 'hover', target, self.set_hover, value=self.hover, feel=POP if target else (.5, .9))
 
     def track(self, point):
         if enabled(self):
@@ -121,7 +254,7 @@ class MotionIcon(QWidget):
             return
         self.reveal = 0.0
         self.update()
-        QTimer.singleShot(delay, self, lambda: tween(self, "_reveal", 0.0, 1.0, self.set_reveal, 600, QEasingCurve.OutBack))
+        spring(self, 'reveal', 1.0, self.set_reveal, value=0.0, feel=POP, delay=delay)
 
     def set_reveal(self, value):
         self.reveal = float(value)
@@ -132,80 +265,157 @@ class MotionIcon(QWidget):
         p = QPainter(self)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         w, h = self.width(), self.height()
-        p.setOpacity(min(1, self.reveal))
+        p.setOpacity(max(0.0, min(1.0, self.reveal*1.4)))
         # Artwork floats independently of the surface: depth comes from the
-        # pointer offset, changing shadow and delayed spring settlement.
-        import math
-        art = int(min(w,h)*.76)
-        angle = -11*self.hover + self.pointer.x()*7*self.hover + (1-self.reveal)*24
+        # pointer offset, changing shadow and spring settlement.
+        art = int(min(w, h)*.70)
+        angle = -11*self.hover+self.pointer.x()*7*self.hover+(1-self.reveal)*24+self.tilt
         footprint = abs(math.cos(math.radians(angle)))+abs(math.sin(math.radians(angle)))
-        sx = min(.55+.45*self.reveal+.16*self.hover,(w-4)/(art*footprint))
-        sy = min(.55+.45*self.reveal+.12*self.hover,(h-4)/(art*footprint))
-        extent = art*max(sx,sy)*footprint/2+1
-        x = max(extent,min(w-extent,w/2+self.pointer.x()*10*self.hover))
-        y = max(extent,min(h-extent,h/2+(1-self.reveal)*58-self.hover*13+self.pointer.y()*8*self.hover))
-        p.translate(x,y)
-        shadow = QRadialGradient(0, h * .32, w * .48)
-        shadow.setColorAt(0, QColor(10, 5, 36, int(95 * self.hover)))
+        grow = .55+.45*self.reveal
+        sx = min((grow+.16*self.hover)*(2-self.stretch), (w-4)/(art*footprint))
+        sy = min((grow+.12*self.hover)*self.stretch, (h-4)/(art*footprint))
+        extent = art*max(sx, sy)*footprint/2+1
+        x = max(extent, min(w-extent, w/2+self.pointer.x()*10*self.hover))
+        y = max(extent, min(h-extent, h/2+(1-self.reveal)*58-self.hover*13+self.pointer.y()*8*self.hover+self.bob))
+        p.translate(x, y)
+        shadow = QRadialGradient(0, h*.32, w*.48)
+        shadow.setColorAt(0, QColor(10, 5, 36, int(95*max(0.0, min(1.0, self.hover)))))
         shadow.setColorAt(1, QColor(10, 5, 36, 0))
         p.setPen(Qt.NoPen)
         p.setBrush(shadow)
         p.drawEllipse(QRectF(-w*.48, h*.15, w*.96, h*.3))
         p.rotate(angle)
-        p.scale(sx,sy)
+        p.scale(sx, sy)
         # Keep a safe apron for spring rotation, lift and pointer parallax.
-        # Painting the artwork edge-to-edge clipped it inside its QWidget.
-        p.drawPixmap(-art // 2, -art // 2, icon(self.name, art).pixmap(art, art))
+        p.drawPixmap(-art // 2, -art // 2, (self.artwork or icon(self.name, art)).pixmap(art, art))
 
 
 class PageEffect(QGraphicsEffect):
-    def __init__(self, widget):
+    """Opacity plus a pixel-aligned rise; glyphs are never scaled."""
+    def __init__(self, widget, rise=22):
         super().__init__(widget)
-        self.amount = 0.0
+        self.amount, self.rise = 0.0, rise
 
     def advance(self, value):
         self.amount = float(value)
         self.update()
 
+    def boundingRectFor(self, rect):
+        reach = abs(self.rise)+2
+        return rect.adjusted(0, -reach, 0, reach)
+
     def draw(self, painter):
+        device = painter.device()
+        dpr = device.devicePixelRatioF() if device else 1.0
+        offset = snap(self.rise*(1-self.amount), dpr)
+        opacity = max(0.0, min(1.0, self.amount*1.3))
+        if opacity >= 1 and not offset:
+            self.drawSource(painter)
+            return
+        if opacity <= 0:
+            return
+        # drawSource ignores painter opacity, so composite the device-resolution
+        # source pixmap instead; it is cached by Qt between frames.
+        origin = QPoint()  # filled in place by Qt
+        pixmap = self.sourcePixmap(Qt.LogicalCoordinates, origin, QGraphicsEffect.PadToEffectiveBoundingRect)
         painter.save()
-        painter.setOpacity(max(0, min(1, self.amount)))
-        rect = self.sourceBoundingRect()
-        painter.translate(rect.width()/2, rect.height()/2 + 54 * (1 - self.amount))
-        painter.scale(.9 + .1*self.amount, .9 + .1*self.amount)
-        painter.translate(-rect.width()/2, -rect.height()/2)
-        self.drawSource(painter)
+        painter.setOpacity(opacity)
+        painter.translate(0, offset)
+        painter.drawPixmap(origin, pixmap)
         painter.restore()
 
 
-def reveal_page(widget):
-    old = getattr(widget, "_page_motion", None)
-    if old:
-        old.stop()
-    widget.setGraphicsEffect(None)
+def reveal_page(widget, delay=0, rise=22, start=0.0, feel=FLUID):
+    """Bring a block in with a rise; an interrupted reveal continues from where it is."""
+    physics.cancel(widget, 'reveal')
     if not enabled(widget):
+        if isinstance(widget.graphicsEffect(), PageEffect):
+            widget.setGraphicsEffect(None)
         return
     parent = widget.parentWidget()
     while parent:
         if parent.graphicsEffect():
             return
         parent = parent.parentWidget()
-    effect = PageEffect(widget)
-    widget.setGraphicsEffect(effect)
-    animation = tween(widget, "_page_motion", 0.0, 1.0, effect.advance, 340)
-    if animation:
-        animation.finished.connect(lambda: widget.setGraphicsEffect(None) if widget.graphicsEffect() is effect else None)
+    effect = widget.graphicsEffect()
+    if effect is not None and not isinstance(effect, PageEffect):
+        return
+    if effect is None:
+        effect = PageEffect(widget, rise)
+        effect.amount = start
+        widget.setGraphicsEffect(effect)
+    else:
+        effect.rise = rise
+    def finished():
+        if widget.graphicsEffect() is effect:
+            widget.setGraphicsEffect(None)
+    spring(widget, 'reveal', 1.0, effect.advance, value=effect.amount, feel=feel, delay=delay, done=finished)
+
+
+def motion_blocks(root):
+    """Visible content blocks in reading order; plain containers are opened up."""
+    found = []
+    def visit(parent):
+        for child in parent.findChildren(QWidget, '', Qt.FindDirectChildrenOnly):
+            if not child.isVisible() or getattr(child, 'motion_layer', False) or isinstance(child, QSplitterHandle):
+                continue
+            if isinstance(child, QScrollArea) and child.widget():
+                visit(child.widget())
+            elif type(child) is QWidget or isinstance(child, QSplitter):
+                visit(child)
+            else:
+                found.append(child)
+    visit(root)
+    def place(widget):
+        point = widget.mapTo(root, QPoint(0, 0))
+        return point.y()//24, point.x()
+    return sorted(found, key=place)
+
+
+def cascade(root, delay=0, rise=24, step=55):
+    """Stagger a page's blocks in; grids and lists run their own inner cascade."""
+    if not enabled(root):
+        return
+    for index, block in enumerate(motion_blocks(root)):
+        lag = delay+min(index*step, 440)
+        if hasattr(block, 'play_entrance'):
+            block.play_entrance(lag)
+        else:
+            reveal_page(block, lag, rise)
+
+
+def snapshot(widget):
+    """A transparent capture of a widget's content (no window background), so
+    a departing page never flashes an opaque fill over the living backdrop."""
+    from PySide6.QtGui import QPixmap, QRegion
+    dpr = widget.devicePixelRatioF()
+    pixmap = QPixmap(max(1, round(widget.width()*dpr)), max(1, round(widget.height()*dpr)))
+    pixmap.setDevicePixelRatio(dpr)
+    pixmap.fill(Qt.transparent)
+    widget.render(pixmap, QPoint(), QRegion(), QWidget.DrawChildren)
+    return pixmap
+
+
+def soften(pixmap):
+    """A cheap, one-off soft-focus copy for dissolves (never redrawn per frame)."""
+    if pixmap is None or pixmap.isNull():
+        return None
+    w, h = pixmap.width(), pixmap.height()
+    small = pixmap.scaled(max(1, w//14), max(1, h//14), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+    return small.scaled(max(1, w//3), max(1, h//3), Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
 
 
 class SceneTransition(QWidget):
-    """A short-lived snapshot layer; real controls remain live underneath.
-
-    Tile navigation grows from its actual source rectangle. Sidebar navigation
-    uses directional depth. Interrupted transitions release both pixmaps.
+    """The outgoing page leaves fast through a soft-focus dissolve, travelling the
+    same way as the sidebar selection; the incoming page's live blocks cascade in
+    underneath. No opaque underlay, so the colour field behind never flashes.
     """
+    motion_layer = True
+    EXIT_MS = 320
+
     def __init__(self, stack, outgoing, origin=None, direction=1):
         super().__init__(stack)
-        self.outgoing, self.incoming = outgoing, stack.currentWidget().grab()
+        self.outgoing, self.soft = outgoing, soften(outgoing)
         self.amount = 0.0
         self.origin = QRectF(origin) if origin else None
         self.direction = direction
@@ -213,7 +423,8 @@ class SceneTransition(QWidget):
         self.setGeometry(stack.rect())
         self.show()
         self.raise_()
-        animation = tween(self, '_scene', 0.0, 1.0, self.advance, 420, QEasingCurve.InOutCubic)
+        cascade(stack.currentWidget(), 90, 26*direction)
+        animation = tween(self, '_scene', 0.0, 1.0, self.advance, self.EXIT_MS, QEasingCurve.Linear)
         if animation:
             animation.finished.connect(self.finish)
         else:
@@ -227,53 +438,36 @@ class SceneTransition(QWidget):
         if getattr(self, '_scene', None):
             self._scene.stop()
         self.hide()
-        self.outgoing = self.incoming = None
+        self.outgoing = self.soft = None
         self.deleteLater()
 
     def paintEvent(self, event):
-        if self.incoming is None:
+        if self.outgoing is None or self.outgoing.isNull():
             return
         p = QPainter(self)
-        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        full, t = QRectF(self.rect()), self.amount
-        boundary=QPainterPath()
-        boundary.addRoundedRect(full,22,22)
-        p.setClipPath(boundary)
-        # Opaque underlay prevents the final live page peeking through early.
-        p.fillRect(full, QColor('#35205d'))
-        if self.outgoing and not self.outgoing.isNull():
-            p.save()
-            p.setOpacity(1 if self.origin else max(0,1-t*2))
-            old = full if self.origin else full.adjusted(t*36, t*20, -t*36, -t*20)
-            if not self.origin:
-                old.translate(-self.direction*t*90, 0)
-            p.drawPixmap(old, self.outgoing, QRectF(self.outgoing.rect()))
-            p.restore()
-        if self.origin:
-            start = self.origin
-            target = QRectF(start.x()*(1-t), start.y()*(1-t),
-                            start.width()+(full.width()-start.width())*t,
-                            start.height()+(full.height()-start.height())*t)
-        else:
-            target = full.adjusted((1-t)*28, (1-t)*18, -(1-t)*28, -(1-t)*18)
-            target.translate(self.direction*(1-t)*110, 0)
-        path = QPainterPath()
-        path.addRoundedRect(target, 26*(1-t), 26*(1-t))
-        p.setClipPath(path,Qt.IntersectClip)
-        p.setOpacity(1 if self.origin else min(1, t*2))
-        # Reveal live-size content through the growing container, rather than
-        # stretching small text and cross-fading two dense interfaces.
-        p.drawPixmap(full if self.origin else target, self.incoming, QRectF(self.incoming.rect()))
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+        t = self.amount
+        presence = 1-t*t*(3-2*t)
+        dpr = self.devicePixelRatioF()
+        # Accelerating departure: the page gathers speed as it leaves.
+        offset = QPointF(0, snap(-self.direction*34*t*t, dpr))
+        focus = min(1.0, t*1.9)
+        p.setOpacity(presence*(1-focus))
+        p.drawPixmap(offset, self.outgoing)
+        if self.soft:
+            p.setOpacity(presence*focus)
+            p.drawPixmap(QRectF(offset, QSize(self.width(), self.height())), self.soft, QRectF(self.soft.rect()))
 
 
 class OrbButton(MotionButton):
-    """A bright circular action with an honest task-driven progress ring."""
-    def __init__(self, text="Explore", parent=None):
+    """Workspace-tinted glass with an honest task-driven progress ring."""
+    def __init__(self, text="Refresh", parent=None):
         super().__init__(text, parent)
         self.setFixedSize(84, 84)
-        self.setAccessibleName("Explore projects")
+        self.setAccessibleName("Refresh projects")
         self.busy, self.angle = False, 0.0
         self.activity = 0.0
+        self.swap, self.previous_text = 1.0, ''
         self.spin = QVariantAnimation(self)
         self.spin.setStartValue(0.0)
         self.spin.setEndValue(360.0)
@@ -285,6 +479,10 @@ class OrbButton(MotionButton):
         self.angle = float(value)
         self.update()
 
+    def set_swap(self, value):
+        self.swap = float(value)
+        self.update()
+
     def set_busy(self, busy):
         changed = self.busy != busy
         self.busy = busy
@@ -292,9 +490,14 @@ class OrbButton(MotionButton):
             def advance(value):
                 self.activity = float(value)
                 self.update()
-            tween(self, '_activity', self.activity, 1.0 if busy else 0.0, advance, 520, QEasingCurve.OutBack)
-        self.setText("Stop" if busy else "Explore")
-        self.setAccessibleName("Cancel current operation" if busy else "Explore projects")
+            spring(self, 'activity', 1.0 if busy else 0.0, advance, value=self.activity, feel=POP if busy else SNAPPY)
+        text = "Stop" if busy else "Refresh"
+        if text != self.text():
+            self.previous_text = self.text()
+            self.setText(text)
+            # The label rolls: old word lifts away while the new one rises in.
+            spring(self, 'swap', 1.0, self.set_swap, value=0.0, feel=(.34, .8))
+        self.setAccessibleName("Cancel current operation" if busy else "Refresh projects")
         if busy and enabled(self) and self.isVisible() and not self.window().isMinimized():
             self.spin.start()
         else:
@@ -310,41 +513,85 @@ class OrbButton(MotionButton):
         super().showEvent(event)
         self.set_busy(self.busy)
 
+    def paint_label(self, p):
+        p.setRenderHint(QPainter.TextAntialiasing)
+        box = QRectF(self.rect())
+        dpr = self.devicePixelRatioF()
+        settle = max(0.0, min(1.0, self.reveal*1.6-.6))
+        swap = max(0.0, min(1.2, self.swap))
+        clip = QPainterPath()
+        clip.addEllipse(QRectF(9, 9, 66, 66))
+        p.setClipPath(clip)
+        p.setPen(QColor("#ffffff"))
+        if self.previous_text and swap < 1:
+            p.setOpacity(settle*(1-min(1.0, swap*1.6)))
+            p.drawText(box.translated(0, snap(-16*swap, dpr)), Qt.AlignCenter, self.previous_text)
+        p.setOpacity(settle*min(1.0, swap*1.4))
+        p.drawText(box.translated(0, snap(16*(1-swap), dpr)), Qt.AlignCenter, self.text())
+
     def paintEvent(self, event):
+        surface = getattr(self.window(), 'surface', None)
+        colors = surface.scene_colors() if surface else [QColor('#243d66'), QColor('#234858'), QColor('#101b30')]
+        drift = getattr(surface, 'refresh_phase', 0.0)
+        def tinted(color, brightness, alpha):
+            result = QColor(color).lighter(brightness)
+            result.setAlpha(alpha)
+            return result
+        tint = tinted(colors[1], 420, 255)
+        # Idle life: the orb breathes and its iridescent rim slowly turns.
+        from .ambient import ambient_time
+        t = ambient_time(self) if enabled(self) else 0.0
+        breath = .5+.5*math.sin(t*1.15)
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        p.save()
         p.translate(42, 42)
-        scale = 1 + .10 * self.hover - .09 * self.press + .035*self.activity
+        scale = (1 + .10 * self.hover - .09 * self.press + .035*self.activity + .08*self.pop + .018*breath)*max(0.0, self.reveal)
         p.scale(scale, scale)
         glow = QRadialGradient(0, 0, 41)
-        glow.setColorAt(0, QColor(237, 56, 233, 95))
-        glow.setColorAt(1, QColor(237, 56, 233, 0))
+        glow.setColorAt(0, tinted(tint, 100, round(28+22*self.hover+18*drift+20*breath)))
+        glow.setColorAt(1, tinted(tint, 100, 0))
         p.setPen(Qt.NoPen)
         p.setBrush(glow)
         p.drawEllipse(QRectF(-41, -41, 82, 82))
-        body = QLinearGradient(-20, -35, 20, 35)
-        body.setColorAt(0, QColor("#eb68ed"))
-        body.setColorAt(.45, QColor("#b831d1"))
-        body.setColorAt(1, QColor("#7625a5"))
+        body = QLinearGradient(-24-12*drift, -35, 24+12*drift, 35)
+        body.setColorAt(0, tinted(colors[0], 400, 140))
+        body.setColorAt(.45, tinted(colors[1], 400, 92))
+        body.setColorAt(1, tinted(colors[2], 340, 165))
         p.setBrush(body)
-        p.setPen(QPen(QColor("#f3c4fb"), 1.2))
+        hue = tint.hsvHueF() if tint.hsvHueF() >= 0 else .7
+        rim = QConicalGradient(0, 0, -t*38)
+        for stop, shift, alpha in ((0, None, 220), (.22, .12, 170), (.5, None, 120), (.74, -.12, 170), (1, None, 220)):
+            rim.setColorAt(stop, QColor(255, 255, 255, alpha) if shift is None else QColor.fromHsvF((hue+shift) % 1.0, .5, 1.0, alpha/255))
+        p.setPen(QPen(rim, 1.4))
         p.drawEllipse(QRectF(-34, -34, 68, 68))
-        highlight = QRadialGradient(-14-self.hover*8,-22,40)
-        highlight.setColorAt(0,QColor(255,255,255,int(80+40*self.hover)))
-        highlight.setColorAt(.5,QColor(255,220,255,15))
+        glass = QLinearGradient(-25,-33,18,33)
+        glass.setColorAt(0,QColor(255,255,255,68))
+        glass.setColorAt(.42,QColor(255,255,255,12))
+        glass.setColorAt(.58,QColor(255,255,255,2))
+        glass.setColorAt(1,tinted(tint,150,44))
+        p.setPen(Qt.NoPen);p.setBrush(glass)
+        p.drawEllipse(QRectF(-33,-33,66,66))
+        highlight = QRadialGradient(-14-self.hover*8+20*drift+3*math.sin(t*.7),-22+2*math.cos(t*.6),38)
+        highlight.setColorAt(0,QColor(255,255,255,int(110+40*max(0.0, self.hover))))
+        highlight.setColorAt(.5,QColor(255,255,255,20))
         highlight.setColorAt(1,QColor(255,255,255,0))
         p.setPen(Qt.NoPen)
         p.setBrush(highlight)
         p.drawEllipse(QRectF(-33,-33,66,66))
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(255,255,255,90), .8))
+        p.drawArc(QRectF(-30,-30,60,60),30*16,100*16)
+        p.setPen(QPen(tinted(tint,170,95),1.2))
+        p.drawArc(QRectF(-31,-31,62,62),210*16,95*16)
         if self.busy:
-            import math
-            p.setPen(QPen(QColor("#fff4ff"), 3, Qt.SolidLine, Qt.RoundCap))
+            p.setPen(QPen(QColor(255,255,255,230), 3, Qt.SolidLine, Qt.RoundCap))
             span = 100 + 65*math.sin(math.radians(self.angle)) if enabled(self) else 100
             p.drawArc(QRectF(-36, -36, 72, 72), int(self.angle * 16), int(span * 16))
-            p.setPen(QPen(QColor(251,177,255,100),1.5,Qt.SolidLine,Qt.RoundCap))
+            p.setPen(QPen(tinted(tint,160,130),1.5,Qt.SolidLine,Qt.RoundCap))
             p.drawArc(QRectF(-39,-39,78,78),int(-self.angle*16),55*16)
         if self.hasFocus():
             p.setPen(QPen(QColor("#ffffff"), 2, Qt.DotLine))
             p.drawEllipse(QRectF(-39, -39, 78, 78))
-        p.setPen(QColor("#ffffff"))
-        p.drawText(QRectF(-34, -20, 68, 40), Qt.AlignCenter, self.text())
+        p.restore()
+        self.paint_label(p)

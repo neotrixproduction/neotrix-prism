@@ -1,14 +1,36 @@
 # Start using Neotrix Prism
 
 1. Extract the Windows ZIP into a stable local folder.
-2. Double-click **Launch Neotrix Prism.cmd**. Python and Qt are bundled.
+2. Double-click **Neotrix Prism.exe**. Python and Qt are bundled.
 3. Open Settings and check your storage roots and application executables.
 4. Open Projects, choose a project and double-click a working file.
 
+Run **Create Desktop Shortcut.cmd** if you want a desktop icon, without installing
+creative-application integrations. See [START_HERE.md](../START_HERE.md) for another PC.
+
 Projects use equal-size cards with equal spacing. Click a card or press Enter.
-Choose a named campaign version when present (such as Vertical or Summer), then
-choose a production stage. General contains files without a named version.
+After opening a project, the cards are ordered **Assets | Versions | Preview**.
+For projects without named campaign versions, **Working files** replaces Versions.
+Versions opens named campaign choices (such as Vertical or Summer), followed by
+production stages. Working files goes directly to stages. General contains files
+without a named version.
 Save revisions such as v001 remain visible in the final file list.
+
+Assets focuses on client materials: Fonts, Logos, Design guide, Brief, Packaging,
+Product photos, Music, Video references and Other client assets. These map to the
+existing `03_PRODUCTION/INPUT/CLIENT_ASSETS` subfolders; Brief also exposes the
+authoritative `02_PREPRODUCTION/brief` folder. The V3 template already has these
+folders, so no duplicate folders are created. Production `3D/ASSETS` work remains
+under Working files/Versions, including its Modelling stage.
+
+Preview offers **Full preview** and **Per-shot preview**, showing only `.mp4` and
+`.mov` outputs. EXRs and other still-image sequences stay out of these lists.
+Shot folders or inferred shot metadata identify per-shot previews; remaining
+indexed video outputs appear under Full preview. Existing Open, Open With, Reveal Folder, Copy Path and Favorite
+actions remain available. Back returns from a file list to its category/group,
+then to the three choices. The project breadcrumb returns directly to those choices.
+Refresh preserves the current section and category; opening a project starts at the
+three choices again. No files are moved or renamed.
 
 File rows support Ctrl/Shift multi-selection. Double-click or Enter opens the
 current file. Use Assign stage to label selected files. Breadcrumb links return
@@ -34,6 +56,7 @@ are rejected with instructions to refresh. Labels remain viewable from cache
 offline, but editing requires a connected writable project. A successful new
 version inherits its source document's explicit stage; old revisions retain theirs.
 
+Dark mode is the only appearance; older light-mode preferences are ignored.
 Manrope is bundled. Labels render without perspective transforms; depth and
 hover effects apply to artwork. Reduce Motion disables animated transitions.
 

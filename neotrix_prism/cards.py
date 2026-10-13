@@ -1,11 +1,20 @@
 """Virtualized, keyboard-operable card surfaces without visible scroll tracks."""
 import math
-from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QEasingCurve, QEvent, QObject
+import time
+from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QEvent, QObject
 from PySide6.QtGui import (QPainter, QColor, QPen, QLinearGradient, QRadialGradient,
                           QPainterPath, QFont, QFontMetrics, QRegion, QImage, QTransform, QPixmap)
 from PySide6.QtWidgets import QWidget, QToolTip
+from . import physics
 from .design import icon
-from .motion import tween, enabled
+from .motion import spring, enabled
+from .physics import SNAPPY, GLIDE
+
+
+def rubber(distance, extent):
+    """iOS-style resistance: overscroll gets heavier the further it travels."""
+    extent = max(1.0, extent)
+    return (1-1/(distance*.55/extent+1))*extent
 
 
 class RoundedClip(QObject):
@@ -43,6 +52,12 @@ class CardSurface(QWidget):
         self.selected_index = self.hover_index = -1
         self.pointer = QPointF()
         self.hover = 0.0
+        # Each card owns its hover and press springs, so leaving one card lets
+        # it settle naturally while the next one lifts.
+        self.hover_levels, self.press_levels = {}, {}
+        self.tilt = (0.0, 0.0)
+        self.press_index = -1
+        self.drag_samples = []
         self.hit_boxes = []
         self.previews = {}
         self.artwork_pixmaps = {}
@@ -94,9 +109,65 @@ class CardSurface(QWidget):
                 self.selection_changed.emit()
         self.update()
 
-    def scroll_to(self,value):
+    def scroll_to(self,value,velocity=None):
+        # Retargeting keeps momentum: rapid wheel ticks merge into one glide.
         self.target = max(0,min(self.limit(),float(value)))
-        tween(self,'_scroll',float(self.offset),float(self.target),self.advance,650 if self.shelf else 460,QEasingCurve.OutBack if self.shelf else QEasingCurve.OutCubic)
+        spring(self,'scroll',self.target,self.advance,value=self.offset,velocity=velocity,
+               feel=GLIDE,precision=.05 if self.shelf else .2)
+
+    def scroll_speed(self):
+        return physics.speed(self,'scroll')
+
+    def hover_key(self,index):
+        return self.entries[index].get('path',index) if 0<=index<len(self.entries) else None
+
+    def hover_level(self,index):
+        return self.hover_levels.get(self.hover_key(index),0.0)
+
+    def press_level(self,index):
+        return self.press_levels.get(self.hover_key(index),0.0)
+
+    def set_hover_index(self,index):
+        if index==self.hover_index:
+            return
+        for previous,target in ((self.hover_index,0.0),(index,1.0)):
+            key=self.hover_key(previous)
+            if key is None:
+                continue
+            def apply(value,key=key):
+                self.hover_levels[key]=value
+                self.update()
+            spring(self,('hover',key),target,apply,value=self.hover_levels.get(key,0.0),
+                   feel=SNAPPY if target else (.44,.92))
+        self.hover_index=index
+        self.hover=1.0 if index>=0 else 0.0
+        if index<0:
+            self.track_tilt(None)
+
+    def set_press_index(self,index):
+        for previous,target in ((self.press_index,0.0),(index,1.0)):
+            key=self.hover_key(previous)
+            if key is None:
+                continue
+            def apply(value,key=key):
+                self.press_levels[key]=value
+                self.update()
+            # Firm press, then a jelly release that briefly swells past rest.
+            spring(self,('press',key),target,apply,value=self.press_levels.get(key,0.0),
+                   feel=(.15,.9) if target else (.36,.42))
+        self.press_index=index
+
+    def track_tilt(self,point):
+        rect=next((r for i,r in self.hit_boxes if i==self.hover_index),None) if point is not None else None
+        if rect is None:
+            target=(0.0,0.0)
+        else:
+            target=(max(-1.0,min(1.0,(point.x()-rect.center().x())/(rect.width()/2))),
+                    max(-1.0,min(1.0,(point.y()-rect.center().y())/(rect.height()/2))))
+        def apply(value):
+            self.tilt=value
+            self.update()
+        spring(self,'tilt',target,apply,value=self.tilt,feel=(.3,.86))
 
     def selectRow(self,index):
         if not 0 <= index < len(self.entries):
@@ -156,36 +227,59 @@ class CardSurface(QWidget):
             self.drag_start = event.position()
             self.drag_offset = self.offset
             self.dragged = False
-            animation = getattr(self,'_scroll',None)
-            if animation:
-                animation.stop()
+            self.drag_samples = [(time.monotonic(),self.offset)]
+            # Catch a gliding grid mid-flight, like a hand stopping a page.
+            physics.cancel(self,'scroll')
+            self.target = self.offset
+            self.set_press_index(self.index_at(event.position()))
             event.accept()
 
     def mouseMoveEvent(self,event):
         self.pointer = event.position()
         if self.drag_start is not None and event.buttons() & Qt.LeftButton:
             distance = event.position()-self.drag_start
-            if distance.manhattanLength()>8:
+            if distance.manhattanLength()>8 and not self.dragged:
                 self.dragged = True
+                self.set_press_index(-1)
             if self.dragged:
                 displacement = distance.x()/220 if self.shelf else distance.y()
-                self.offset = self.target = max(0,min(self.limit(),self.drag_offset-displacement))
+                raw = self.drag_offset-displacement
+                if not self.shelf and raw<0:
+                    raw = -rubber(-raw,self.height())
+                elif not self.shelf and raw>self.limit():
+                    raw = self.limit()+rubber(raw-self.limit(),self.height())
+                elif self.shelf:
+                    raw = max(0,min(self.limit(),raw))
+                self.offset = self.target = raw
+                self.drag_samples = (self.drag_samples+[(time.monotonic(),raw)])[-6:]
                 self.update()
                 return
         index = self.index_at(event.position())
         if index != self.hover_index:
-            self.hover_index = index
-            self.hover = 0.0
-            tween(self,'_hover',0.0,1.0,self.set_hover,400,QEasingCurve.OutBack)
+            self.set_hover_index(index)
             self.setCursor(Qt.PointingHandCursor if index>=0 else Qt.ArrowCursor)
+        if index>=0 and enabled(self):
+            self.track_tilt(event.position())
         self.update()
+
+    def end_drag(self):
+        """Release a drag with its real velocity; overscroll springs back."""
+        first,last = self.drag_samples[0],self.drag_samples[-1]
+        span = last[0]-first[0]
+        velocity = (last[1]-first[1])/span if span>.008 else 0.0
+        if self.shelf:
+            self.scroll_to(round(self.offset))
+            return
+        projected = self.offset+velocity*.3
+        self.scroll_to(projected,velocity)
 
     def set_hover(self,value):
         self.hover = float(value)
         self.update()
 
     def leaveEvent(self,event):
-        self.hover_index = -1
+        self.set_hover_index(-1)
+        self.setCursor(Qt.ArrowCursor)
         self.update()
         super().leaveEvent(event)
 
@@ -193,9 +287,9 @@ class CardSurface(QWidget):
         if event.button()!=Qt.LeftButton or self.drag_start is None:
             return
         self.drag_start = None
+        self.set_press_index(-1)
         if self.dragged:
-            if self.shelf:
-                self.scroll_to(round(self.offset))
+            self.end_drag()
             return
         index = self.index_at(event.position())
         if index >= 0:

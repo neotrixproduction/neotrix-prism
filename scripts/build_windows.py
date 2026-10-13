@@ -4,6 +4,8 @@ import importlib.metadata
 import json
 import shutil
 import sys
+import os
+import subprocess
 import zipfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -24,9 +26,17 @@ def main():
     shutil.copytree(ROOT / "assets", PACKAGE / "assets", dirs_exist_ok=True)
     (PACKAGE / "scripts").mkdir(exist_ok=True)
     shutil.copy2(ROOT / "scripts/install-integrations.ps1", PACKAGE / "scripts/install-integrations.ps1")
-    for name in ("launch.py", "README.md", "UPSTREAM.md", "VALIDATION.md", "requirements-neotrix.txt", "requirements-runtime-lock.txt", "license-LGPL.txt", "license_GPL.txt"):
+    for name in ('create-shortcut.ps1','functional_runtime_smoke.py','windows_launcher.cs'):
+        shutil.copy2(ROOT/'scripts'/name,PACKAGE/'scripts'/name)
+    compiler = Path(os.environ['WINDIR'])/'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+    subprocess.run([str(compiler),'/nologo','/target:winexe','/platform:x64',
+                    '/reference:System.Windows.Forms.dll',
+                    '/win32icon:'+str(ROOT/'assets/neotrix.ico'),
+                    '/out:'+str(PACKAGE/'Neotrix Prism.exe'),str(ROOT/'scripts/windows_launcher.cs')],check=True)
+    for name in ("launch.py", "START_HERE.md", "README.md", "UPSTREAM.md", "VALIDATION.md", "requirements-neotrix.txt", "requirements-runtime-lock.txt", "license-LGPL.txt", "license_GPL.txt"):
         shutil.copy2(ROOT / name, PACKAGE / name)
-    (PACKAGE / "Launch Neotrix Prism.cmd").write_text('@echo off\nstart "" "%~dp0runtime\\pythonw.exe" "%~dp0launch.py"\n')
+    (PACKAGE / "Launch Neotrix Prism.cmd").write_text('@echo off\nstart "" "%~dp0Neotrix Prism.exe"\n')
+    (PACKAGE / "Create Desktop Shortcut.cmd").write_text('@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\\create-shortcut.ps1"\npause\n')
     (PACKAGE / "Install Integrations.cmd").write_text('@echo off\npowershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\\install-integrations.ps1"\npause\n')
     build(PACKAGE / "integration-packages")
     licenses = PACKAGE / "ThirdPartyLicenses"

@@ -39,6 +39,8 @@ class Bridge(QObject):
                     if not 0 < size < 8192:
                         raise ValueError("Invalid message size")
                     data = json.loads(self.rfile.read(size))
+                    if not isinstance(data, dict):
+                        raise ValueError('Expected a command object')
                     app, command = data.get("app"), data.get("command")
                     if app not in ("photoshop", "aftereffects") or command not in COMMANDS:
                         raise ValueError("Unsupported application or command")

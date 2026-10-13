@@ -23,9 +23,9 @@ def initialize():
         _loaded = True
     display, text = roles()
     font = QFont(text)
-    font.setPixelSize(13)
-    font.setHintingPreference(QFont.PreferFullHinting)
-    font.setStyleStrategy(QFont.PreferAntialias)
+    font.setPixelSize(14)
+    font.setHintingPreference(QFont.PreferVerticalHinting)
+    font.setStyleStrategy(QFont.PreferAntialias | QFont.PreferQuality)
     app.setFont(font)
 
 

@@ -6,18 +6,18 @@ Effects and Fusion, save working versions, and organize files with shared stage 
 
 The interface uses a continuous purple-to-indigo background, luminous tinted
 tiles, dimensional original icons and choreographed motion inspired by the current
-CleanMyMac design. Both appearances use colored surfaces; the dark variant
-reduces brightness. Sidebar, file lists, settings and native Prism dialogs share
-the same palette. Projects use uniformly spaced cards, followed by named-version and stage cards,
-then a native-resolution file list. Scroll, drag or use arrow keys to browse. Scrollbars are hidden across Neotrix surfaces.
+CleanMyMac design. Dark mode is the only appearance. Sidebar, file lists, settings and native Prism dialogs share
+the same visual system. Opening a project shows **Assets | Versions/Working files | Preview**.
+Client assets have category cards; working files follow named-version and stage choices;
+previews separate full-video and per-shot MP4/MOV outputs. Scroll, drag or use arrow
+keys to browse. Scrollbars are hidden across Neotrix surfaces.
 
 The rounded Windows shell includes custom window controls, draggable caption,
-edge resizing and a collapsible animated sidebar. The home uses
-staggered card/icon entrances, spring-driven tile expansion, pointer parallax,
-reactive lighting, highlight sweeps and click ripples. Opening a home tile reveals
-its destination through a growing rounded surface; sidebar navigation uses
-directional depth. A morphing circular control shows task progress. Reduced motion
-disables the timelines, including an in-flight page transition.
+edge resizing and a collapsible animated sidebar. Projects is the opening page.
+Retargetable springs, artwork-derived colors, floating 3D artwork, zoom-through
+navigation and a refresh shockwave share the same motion system. The glass Refresh
+control follows workspace colors and becomes Stop during real tasks. Reduced motion
+settles active transitions. Native-size labels remain separate from artwork transforms.
 
 Manrope provides heading and body typography with distinct sizes and weights.
 The OFL font files and license are bundled; no font installation is required.
@@ -30,7 +30,7 @@ not mesh models. Existing preview images are used without launching applications
 
 [Watch the real Qt motion preview](docs/screenshots/motion.mp4).
 
-![Neotrix workspace](docs/screenshots/home.png)
+The screenshots and recorded motion below show earlier preview revisions.
 ![Working files across applications](docs/screenshots/projects.png)
 ![Uniform project grid](docs/screenshots/project-library.png)
 ![Production stage cards](docs/screenshots/stages.png)
@@ -38,28 +38,30 @@ not mesh models. Existing preview images are used without launching applications
 ## Run on Windows
 
 Download the Windows preview package from this repository's Releases, extract it
-to a stable folder, and double-click **Launch Neotrix Prism.cmd**. Python and Qt
+to a stable folder, and double-click **Neotrix Prism.exe**. Python and Qt
 are included; there is no separate Python installation.
 
 Open Settings to check storage roots and application paths. Relay is the default
 shared project library. Projects are scanned in place; existing production
 folders are not migrated or renamed.
 
+Optionally run **Create Desktop Shortcut.cmd** for the app shortcut.
 Run **Install Integrations.cmd** for the separate Blender and Adobe integrations.
 Photoshop's docked UXP panel requires Adobe's UXP installer; a companion JSX can
 open the Qt workspace when that installer is unavailable.
 
-See [Setup](docs/SETUP.md) for project icons, stage labels, opening files and version saving.
+See [Start here](START_HERE.md) for another PC and [Setup](docs/SETUP.md) for project
+icons, stage labels, opening files and version saving.
 
 ## Included
 
 - Uniform project cards, named campaign versions, 3D stage cards and a multi-selection file list.
 - Per-project artwork loaded asynchronously from `_TOOLS/icon`, with cached fallback.
 - Shared stage labels with concurrent-edit protection and offline browsing.
-- Application, department, shot and save-revision filters; working files and outputs.
+- Application, shot and save-revision filters; working files and outputs.
 - Open, Open With, Reveal Folder, Copy Path, favorites and recent projects.
 - In-memory version saves through Blender, Photoshop and After Effects adapters.
-- Light/dark appearance, keyboard focus and a reduced-motion setting.
+- Dark appearance, keyboard focus and a reduced-motion setting.
 - Retained Prism-managed project and production services with the Neotrix theme.
 
 The screenshots use fictional indexing fixtures. They are screenshots of the

@@ -145,8 +145,10 @@ def test_shared_graph_conflict_and_offline(tmp_path):
     assert second != first
     with pytest.raises(RuntimeError, match="changed"):
         library.save("example.json", value, first)
-    renamed = tmp_path / "offline-share"
-    root.rename(renamed)
+    # Simulate an unreachable root without relying on Windows allowing a
+    # freshly scanned directory to be renamed while antivirus holds a handle.
+    library.root = tmp_path / "offline-share"
+    library.path = library.root / "_NEOTRIX_PRISM" / "Graphs"
     assert not library.online()
     assert library.list()
     with pytest.raises(OSError):

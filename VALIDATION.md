@@ -1,5 +1,10 @@
 # Validation — Neotrix Prism 0.2.0 preview
 
+For the current accepted UI's functional audit, see
+[docs/FUNCTIONAL_AUDIT.md](docs/FUNCTIONAL_AUDIT.md): 49 automated tests,
+100/150/200% UI checks, real host checks and preserved visual/animation hashes.
+The release notes below remain historical evidence for earlier revisions.
+
 ## Verified on this workstation
 
 - Service, save-wrapper and native Qt interaction tests: 18 passing.

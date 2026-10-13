@@ -25,35 +25,47 @@ class Caption(QWidget):
         self.drag_offset = None
         self.max_drag = False
         self.setObjectName("caption")
-        self.setFixedHeight(36)
+        self.setFixedHeight(32)
         layout = QHBoxLayout(self)
         layout.setContentsMargins(18, 6, 18, 2)
         layout.setSpacing(9)
-        for name, color, callback, identifier in (("Close window", "#ff646b", window.close, "windowClose"),
-                                      ("Minimize window", "#ffc35b", window.showMinimized, "windowMinimize"),
-                                      ("Maximize or restore window", "#5ad678", self.toggle_maximize, "windowMaximize")):
-            control = MotionButton("")
-            control.setObjectName(identifier)
-            control.setFixedSize(15, 15)
-            control.setAccessibleName(name)
-            control.setToolTip(name)
-            control.setStyleSheet("QPushButton {background:" + color + ";border:1px solid rgba(255,255,255,65);border-radius:7px;padding:0;} QPushButton:focus {border:2px solid white;}")
-            control.clicked.connect(callback)
-            layout.addWidget(control)
-        layout.addStretch()
         self.title = QLabel("Neotrix Prism")
         self.title.setAttribute(Qt.WA_TransparentForMouseEvents)
         self.title.setStyleSheet("color:#e6d3f4;font-size:12px;background:transparent;")
-        layout.addWidget(self.title)
-        layout.addStretch()
-        self.collapse = MotionButton("‹")
+        self.title.setAlignment(Qt.AlignCenter)
+        self.collapse = MotionButton("›")
         self.collapse.setFixedSize(26, 24)
         self.collapse.setStyleSheet("QPushButton {padding:0;border:1px solid rgba(255,255,255,30);border-radius:8px;background:rgba(255,255,255,12);font-size:19px;}")
         self.collapse.setAccessibleName("Collapse or expand navigation")
         self.collapse.setToolTip("Collapse or expand navigation")
         self.collapse.clicked.connect(window.toggle_sidebar)
-        layout.addWidget(self.collapse)
-        layout.addSpacing(37)
+        # Equal side slots keep the title centered while controls sit at right.
+        navigation_slot = QWidget()
+        navigation_slot.setFixedWidth(63)
+        navigation_layout = QHBoxLayout(navigation_slot)
+        navigation_layout.setContentsMargins(0, 0, 0, 0)
+        navigation_layout.addWidget(self.collapse)
+        navigation_layout.addStretch()
+        layout.addWidget(navigation_slot)
+        layout.addWidget(self.title, 1)
+        controls = QWidget()
+        controls.setFixedWidth(63)
+        controls_layout = QHBoxLayout(controls)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(9)
+        for name, color, callback, identifier in (
+                ("Minimize window", "#ffc35b", window.showMinimized, "windowMinimize"),
+                ("Maximize or restore window", "#5ad678", self.toggle_maximize, "windowMaximize"),
+                ("Close window", "#ff646b", window.close, "windowClose")):
+            control = MotionButton({'windowMinimize':'−', 'windowMaximize':'+', 'windowClose':'×'}[identifier])
+            control.setObjectName(identifier)
+            control.setFixedSize(15, 15)
+            control.setAccessibleName(name)
+            control.setToolTip(name)
+            control.setStyleSheet("QPushButton {background:" + color + ";color:rgba(20,12,28,220);font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,65);border-radius:7px;padding:0;} QPushButton:focus {border:2px solid white;}")
+            control.clicked.connect(callback)
+            controls_layout.addWidget(control)
+        layout.addWidget(controls)
 
     def toggle_maximize(self):
         self.host.showNormal() if self.host.isMaximized() else self.host.showMaximized()

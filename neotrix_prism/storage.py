@@ -1,6 +1,7 @@
 """Local preferences, atomic shared documents and activity records."""
 import hashlib
 import json
+import math
 import os
 import tempfile
 import time
@@ -65,9 +66,20 @@ class Settings:
     def __init__(self):
         self.path = user_dir() / "settings.json"
         self.data = read_json(self.path, {})
-        for key, value in {"roots": [DEFAULT_ROOT], "apps": {}, "favorites": [], "recent": [],
-                           "theme": "light", "reduced_motion": False}.items():
-            self.data.setdefault(key, value)
+        if not isinstance(self.data, dict):
+            self.data = {}
+        defaults = {"roots": [DEFAULT_ROOT], "apps": {}, "favorites": [], "recent": [],
+                    "theme": "dark", "reduced_motion": False}
+        for key, value in defaults.items():
+            current = self.data.get(key)
+            valid = isinstance(current, type(value))
+            if isinstance(value, list):
+                valid = valid and all(isinstance(item, str) and item.strip() for item in current)
+            elif isinstance(value, dict):
+                valid = valid and all(isinstance(k, str) and isinstance(v, str) for k,v in current.items())
+            if not valid:
+                self.data[key] = value
+        self.data['theme'] = 'dark'
 
     def save(self):
         atomic_json(self.path, self.data)
@@ -99,8 +111,17 @@ def history():
     records = []
     for line in path.read_text(encoding="utf-8").splitlines()[-250:]:
         try:
-            records.append(json.loads(line))
-        except ValueError:
+            record = json.loads(line)
+            if not isinstance(record, dict) or not isinstance(record.get('event'), str):
+                continue
+            timestamp = record.get('time')
+            if not isinstance(timestamp, (int, float)) or isinstance(timestamp, bool) or not math.isfinite(timestamp):
+                continue
+            time.localtime(timestamp)
+            if any(key in record and not isinstance(record[key], str) for key in ('path','name','application','stage')):
+                continue
+            records.append(record)
+        except (ValueError, OverflowError, OSError):
             pass
     return list(reversed(records))
 

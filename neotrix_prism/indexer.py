@@ -17,6 +17,7 @@ SKIP = {"node_modules", "__pycache__", "$recycle.bin", "#recycle", "system volum
 STAGES = {"Preproduction": ("preproduction", "preprod", "storyboard", "animatic"),
           "Modeling": ("modeling", "modelling", "model"), "Lookdev": ("lookdev", "shading", "texture"),
           "Rigging": ("rigging", "rig"), "Layout": ("layout", "blocking"), "Animation": ("animation", "anim"),
+          "FX": ("fx", "vfx", "simulation", "simulations", "sim"),
           "Lighting": ("lighting", "light"), "Rendering": ("rendering", "renders", "render"),
           "Post": ("post", "compositing", "comp", "finishing"), "Delivery": ("delivery", "final", "approved")}
 DEPARTMENTS = {"3D": "3D", "GRAPHIC_DESIGN": "Graphic Design", "MOTION_GRAPHICS": "Motion Graphics",
@@ -33,6 +34,38 @@ def skip_dir(name):
 
 def list_projects(root):
     return sorted([str(p) for p in Path(root).iterdir() if p.is_dir() and not p.is_symlink() and not skip_dir(p.name)], key=natural)
+
+
+def is_asset(file):
+    return any(part.lower() in ('assets', 'client_assets')
+               for part in file['relative'].replace('\\', '/').split('/')[:-1])
+
+
+CLIENT_CATEGORIES = {'fonts':'Fonts', 'logos':'Logos', 'brand_guidelines':'Design guide',
+                     'brief':'Brief', 'packaging':'Packaging', 'product_photos':'Product photos',
+                     'music':'Music', 'video_references':'Video references', 'other':'Other client assets'}
+PREVIEW_GROUPS = {'full':'Full preview', 'shot':'Per-shot preview'}
+
+
+def asset_category(file):
+    parts=file['relative'].replace('\\','/').lower().split('/')[:-1]
+    if '02_preproduction' in parts and 'brief' in parts:return 'brief'
+    if 'client_assets' not in parts:return None
+    index=parts.index('client_assets')+1
+    category=parts[index] if index<len(parts) else 'other'
+    return category if category in CLIENT_CATEGORIES else 'other'
+
+
+def preview_group(file):
+    parts=file['relative'].replace('\\','/').lower().split('/')[:-1]
+    return 'shot' if 'shots' in parts or file.get('shot','Unspecified') not in ('','Unspecified') else 'full'
+
+
+def in_section(file, section):
+    client = asset_category(file) is not None
+    if section == 'assets':return client
+    if section == 'preview':return not client and not is_asset(file) and file.get('kind', 'working') == 'output' and Path(file['name']).suffix.lower() in ('.mp4','.mov')
+    return not client
 
 
 def parse(path, project):
@@ -114,7 +147,9 @@ def scan(project, cancel=None, progress=None):
                        d for d in dirs if not skip_dir(d) and not Path(directory, d).is_symlink()]
         for name in names:
             path = Path(directory, name)
-            if path.is_symlink() or (path.suffix.lower() not in EXTENSIONS
+            scope = {'relative': str(path.relative_to(project))}
+            asset_path = is_asset(scope) or asset_category(scope) is not None
+            if name.startswith('.') or path.is_symlink() or (not asset_path and path.suffix.lower() not in EXTENSIONS
                and not (path.suffix.lower() in MEDIA and any(p.lower() in OUTPUT_DIRS for p in path.relative_to(project).parts[:-1]))):
                 continue
             if re.search(r"(?i)auto[- ]?save|(?:^|[_. -])(?:tmp|temp|backup)(?:[_. -]|$)", name):

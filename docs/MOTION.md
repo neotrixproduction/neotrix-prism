@@ -1,5 +1,9 @@
 # Neotrix motion and rounded window
 
+For the current all-page refresh implementation and revision instructions, read
+[REFRESH_ANIMATION.md](REFRESH_ANIMATION.md). Some descriptions below document
+earlier releases, including Home and removed browsing behavior.
+
 The current design was compared with MacPaw's official
 [CleanMyMac overview](https://macpaw.com/cleanmymac) and its
 [30-second interface demo](https://cdn3.macpaw.com/video/cleanmymac5-overview/en-cleanmymac5-overview.mp4).

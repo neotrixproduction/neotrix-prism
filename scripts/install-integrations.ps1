@@ -64,8 +64,7 @@ if (-not $SkipPhotoshop) {
 }
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Neotrix Prism.lnk'))
-$shortcut.TargetPath = Join-Path $Root 'runtime\pythonw.exe'
-$shortcut.Arguments = '"' + (Join-Path $Root 'launch.py') + '"'
+$shortcut.TargetPath = Join-Path $Root 'Neotrix Prism.exe'
 $shortcut.WorkingDirectory = $Root
 $shortcut.Description = 'Neotrix creative project workspace'
 $shortcut.IconLocation = Join-Path $Root 'assets\neotrix.ico'
