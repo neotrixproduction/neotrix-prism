@@ -1,90 +1,145 @@
 # Neotrix Prism
 
-A Windows creative-project workspace built on the open-source Prism Pipeline.
-Browse existing project folders across Blender, Illustrator, Photoshop, After
-Effects and Fusion, save working versions, and organize files with shared stage labels.
+A portable Windows workspace for creative projects, built on the open-source
+[Prism Pipeline](https://github.com/PrismPipeline/Prism). Browse existing folders,
+find client assets, open creative documents, save new working versions and review
+full-video or per-shot previews without reorganizing production files.
 
-The interface uses a continuous purple-to-indigo background, luminous tinted
-tiles, dimensional original icons and choreographed motion inspired by the current
-CleanMyMac design. Dark mode is the only appearance. Sidebar, file lists, settings and native Prism dialogs share
-the same visual system. Opening a project shows **Assets | Versions/Working files | Preview**.
-Client assets have category cards; working files follow named-version and stage choices;
-previews separate full-video and per-shot MP4/MOV outputs. Scroll, drag or use arrow
-keys to browse. Scrollbars are hidden across Neotrix surfaces.
+**[Download the Windows 0.6.0 preview](https://github.com/neotrixproduction/neotrix-prism/releases/tag/v0.6.0-preview)** ·
+[Setup guide](START_HERE.md)
 
-The rounded Windows shell includes custom window controls, draggable caption,
-edge resizing and a collapsible animated sidebar. Projects is the opening page.
-Retargetable springs, artwork-derived colors, floating 3D artwork, zoom-through
-navigation and a refresh shockwave share the same motion system. The glass Refresh
-control follows workspace colors and becomes Stop during real tasks. Reduced motion
-settles active transitions. Native-size labels remain separate from artwork transforms.
+![Neotrix Prism 0.6 project library](docs/screenshots/0.6/project-library.png)
 
-Manrope provides heading and body typography with distinct sizes and weights.
-The OFL font files and license are bundled; no font installation is required.
-See [Motion and visual reference](docs/MOTION.md).
+## Browse a project
 
-Creative applications use thick 3D artwork based on their actual installed app
-icons. The transparent assets and complete generation prompts are in
-[assets/app-icons](assets/app-icons/SOURCE.json). These are rendered PNG assets,
-not mesh models. Existing preview images are used without launching applications.
+Opening a project presents **Assets | Versions / Working files | Preview**.
 
-[Watch the real Qt motion preview](docs/screenshots/motion.mp4).
+- **Assets:** client fonts, logos, design guides, briefs, packaging, product photos,
+  music and video references. Production assets remain in Working files.
+- **Versions / Working files:** choose a named campaign version when present,
+  then a production stage and its files. Projects without named versions go
+  directly to stages.
+- **Preview:** separate Full preview and Per-shot preview collections, showing
+  MP4 and MOV videos. Image sequences and EXRs are excluded from this section.
 
-The screenshots and recorded motion below show earlier preview revisions.
-![Working files across applications](docs/screenshots/projects.png)
-![Uniform project grid](docs/screenshots/project-library.png)
-![Production stage cards](docs/screenshots/stages.png)
+![Assets, Versions and Preview project navigation](docs/screenshots/0.6/project-overview.png)
+
+### Client assets
+
+![Client asset categories](docs/screenshots/0.6/client-assets.png)
+
+### Production stages
+
+Browse modelling, rigging, layout, animation, FX, lighting, compositing and other
+work. Shared stage assignments support single-file and multi-selection changes;
+explicit assignments override folder inference without moving files.
+
+![Production stage cards](docs/screenshots/0.6/stages.png)
+
+### Working files
+
+Filter by application, shot and save revision. File rows show stage, application,
+revision and modification date, with details and actions beside the selection.
+Open files, choose another application, reveal folders, copy paths or add favorites.
+Blender, Photoshop and After Effects adapters can save the current document,
+including unsaved edits, as a new working version.
+
+![Working files with application icons and document actions](docs/screenshots/0.6/working-files.png)
+
+### Video previews
+
+![Full preview and Per-shot preview collections](docs/screenshots/0.6/preview.png)
+
+<details>
+<summary>More current screenshots: versions, favorites, activity and settings</summary>
+
+### Named versions
+
+![Named campaign versions](docs/screenshots/0.6/versions.png)
+
+### Favorites
+
+![Favorite projects and documents](docs/screenshots/0.6/favorites.png)
+
+### Activity
+
+![Local activity history](docs/screenshots/0.6/activity.png)
+
+### Settings
+
+![Storage and creative application settings](docs/screenshots/0.6/settings.png)
+
+</details>
+
+These are current **0.6.0 native Qt screenshots**, captured at 150% Windows
+scaling with fictional demo projects. No production documents or credentials
+are included. [Capture details and reproduction](docs/screenshots/0.6/README.md).
 
 ## Run on Windows
 
-Download the Windows preview package from this repository's Releases, extract it
-to a stable folder, and double-click **Neotrix Prism.exe**. Python and Qt
-are included; there is no separate Python installation.
+1. Download the ZIP from the [0.6.0 preview release](https://github.com/neotrixproduction/neotrix-prism/releases/tag/v0.6.0-preview).
+2. Extract the **whole ZIP** to a stable local folder.
+3. Double-click **Neotrix Prism.exe**. Keep the runtime and assets beside it.
+4. Open Settings to check storage roots and creative application paths.
 
-Open Settings to check storage roots and application paths. Relay is the default
-shared project library. Projects are scanned in place; existing production
-folders are not migrated or renamed.
+Use **64-bit Windows 10 or 11**. Python, Qt, Manrope and runtime DLLs are included;
+no separate Python, Qt or font installation is needed. Creative applications must
+be installed separately to open their documents. Video files use the PC's
+associated player.
 
-Optionally run **Create Desktop Shortcut.cmd** for the app shortcut.
-Run **Install Integrations.cmd** for the separate Blender and Adobe integrations.
+The default project root is `\\NeoVault\Relay`. Other PCs need network access and
+their own share permissions; a mapped drive is not required. Additional roots
+can be added in Settings. Existing folders are scanned in place and are not
+automatically converted into Prism-managed projects.
+
+Optionally run **Create Desktop Shortcut.cmd** for an app shortcut. Run
+**Install Integrations.cmd** for the separate Blender and Adobe panels.
 Photoshop's docked UXP panel requires Adobe's UXP installer; a companion JSX can
-open the Qt workspace when that installer is unavailable.
+open the Qt workspace when that installer is unavailable. If the portable folder
+moves, rerun the integration installer and shortcut creator.
 
-See [Start here](START_HERE.md) for another PC and [Setup](docs/SETUP.md) for project
-icons, stage labels, opening files and version saving.
+See [Start here](START_HERE.md) for another PC and [Setup](docs/SETUP.md) for
+project icons, shared stage labels, integrations and version saving.
 
-## Included
+## Interface and storage
 
-- Uniform project cards, named campaign versions, 3D stage cards and a multi-selection file list.
-- Per-project artwork loaded asynchronously from `_TOOLS/icon`, with cached fallback.
-- Shared stage labels with concurrent-edit protection and offline browsing.
-- Application, shot and save-revision filters; working files and outputs.
-- Open, Open With, Reveal Folder, Copy Path, favorites and recent projects.
-- In-memory version saves through Blender, Photoshop and After Effects adapters.
-- Dark appearance, keyboard focus and a reduced-motion setting.
-- Retained Prism-managed project and production services with the Neotrix theme.
+The dark interface combines rounded gradient cards, generated dimensional
+artwork, Manrope typography and a collapsible sidebar. Retargetable spring
+motion, floating artwork, zoom-through navigation and a glass Refresh control
+share one motion system. Refresh is available on every page; reduced motion is
+available in Settings. Text stays at native size during artwork animation.
 
-The screenshots use fictional indexing fixtures. They are screenshots of the
-native Qt app, not browser mockups.
+Custom project artwork loads asynchronously from `_TOOLS/icon`, with local
+caching and bundled fallbacks. Preferences, caches and activity are stored per
+user. Shared stage assignments have concurrent-edit protection; cached browsing
+remains available offline, while shared writes require connected writable storage.
+
+- [Motion and visual reference](docs/MOTION.md)
+- [Refresh animation handoff](docs/REFRESH_ANIMATION.md)
+- [Application icon artwork and generation sources](assets/app-icons/SOURCE.json)
 
 ## Preview status
 
 Real open/save/reopen checks passed for Blender, Photoshop and After Effects;
-file-opening checks passed for Illustrator and Fusion. Desktop scaling was
-reviewed at 100%, 150% and 200%.
+file-opening checks passed for Illustrator and standalone Fusion. Desktop scaling
+was reviewed at 100%, 150% and 200%.
 
-The Photoshop UXP installation and the true two-workstation pilot are still
-pending. Native advanced Prism tools keep their established layouts with the
-shared Neotrix theme. See [Validation](VALIDATION.md) for evidence and limits.
+Photoshop UXP installation, a clean physical second-PC check and the true
+two-workstation pilot remain pending. The preview executable is unsigned.
+Native advanced Prism tools retain their established layouts with the shared
+Neotrix theme. See [Validation](VALIDATION.md) and the
+[functional audit](docs/FUNCTIONAL_AUDIT.md) for evidence and limits.
 
 ## Source and maintenance
 
 Forked from [PrismPipeline/Prism](https://github.com/PrismPipeline/Prism), pinned to
-v2.1.3, fd440de6747b7e62e2ba8cb675028e7adbbce1e3. Upstream history and license notices
+v2.1.3, `fd440de6747b7e62e2ba8cb675028e7adbbce1e3`. Upstream history and license notices
 are retained. No commercial Prism plugins are included.
 
-The independent Workflows feature is removed from this release. Existing shared graph documents are preserved.
-Automatic upstream replacement is disabled; upgrades are merged and tested.
+The independent Workflows feature is removed. Existing shared graph documents
+are preserved, and native Prism production tools remain available in Settings.
+Automatic upstream replacement is disabled; upgrades are deliberate merges
+followed by validation.
 
 - [Development](docs/DEVELOPMENT.md)
 - [Upstream changes](UPSTREAM.md)
