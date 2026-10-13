@@ -11,7 +11,7 @@ async function send(command) {
 }
 entrypoints.setup({panels:{neotrixPanel:{
     show() {
-        [["saveVersionBtn","saveVersion"],["projectBrowserBtn","projectBrowser"],
+        [["fileCommentsBtn","fileComments"],["saveVersionBtn","saveVersion"],["projectBrowserBtn","projectBrowser"],
          ["exportBtn","export"],["settingsBtn","settings"]].forEach(function(pair) {
             const item = document.getElementById(pair[0]);
             if(item) item.onclick = function(){ send(pair[1]); };

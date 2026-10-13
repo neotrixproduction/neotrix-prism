@@ -6,7 +6,7 @@ from PySide6.QtCore import QObject, Signal
 
 PORT = 16400
 COMMANDS = {"connectPhotoshop", "disconnect", "saveVersion", "saveExtended", "export", "projectBrowser",
-            "settings", "importMedia", "checkVersions", "render"}
+            "settings", "importMedia", "checkVersions", "render", "fileComments"}
 
 
 class Bridge(QObject):
@@ -62,6 +62,11 @@ class Bridge(QObject):
                 save_version_dialog(core, self.window)
             elif command == "projectBrowser":
                 core.neotrixBrowser()
+            elif command == "fileComments":
+                filepath = core.appPlugin.getCurrentFileName(core)
+                if not filepath:
+                    raise ValueError('Save the current document before commenting.')
+                core.neotrixBrowser().file_comments(filepath, app)
             elif command == "settings":
                 shell = core.neotrixBrowser()
                 shell.navigate("Settings")

@@ -29,7 +29,7 @@ def natural(text):
 
 
 def skip_dir(name):
-    return name.lower() in SKIP or name.startswith((".", "#", "@")) or name.lower().endswith(".blend.neotrix")
+    return name.lower() in SKIP or name.startswith((".", "#", "@")) or name.lower().endswith(".neotrix")
 
 
 def list_projects(root):

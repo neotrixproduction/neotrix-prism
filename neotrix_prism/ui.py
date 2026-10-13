@@ -586,6 +586,8 @@ class MainWindow(QMainWindow):
         self.more_actions = MotionButton('More actions  ···')
         self.more_actions.setMenu(more_menu)
         inner.addWidget(self.more_actions)
+        self.comments_button = button('Read / write comments', self.file_comments)
+        inner.addWidget(self.comments_button)
         detail.setMinimumHeight(210)
         split.addWidget(detail)
         split.setStretchFactor(0, 1)
@@ -1014,6 +1016,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "details_panel") and self.details_panel.isVisible():
             reveal_page(self.details_panel, rise=8, start=.45)
         file = self.selected()
+        self.comments_button.setEnabled(bool(file))
         self.more_actions.setEnabled(bool(file))
         if hasattr(self,"assign_button"):
             self.assign_button.setEnabled(bool(self.file_cards.selectedItems()) and self.stage_document.get("writable",False))
@@ -1065,6 +1068,16 @@ class MainWindow(QMainWindow):
         apps.open_file(path, application, self.settings.data["apps"], executable)
         activity("File opened", path=path, application=application)
         self.status.setText("Opened " + Path(path).name)
+
+    def file_comments(self, filepath=None, application='Neotrix Prism'):
+        if not isinstance(filepath, str):
+            selected = self.selected()
+            if not selected:
+                return
+            filepath = selected['path']
+        from .comment_dialog import CommentDialog
+        dialog = CommentDialog(filepath, self, application)
+        dialog.exec()
 
     def open_selected(self):
         file = self.selected()

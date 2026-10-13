@@ -52,6 +52,21 @@ class NEOTRIX_OT_save(bpy.types.Operator):
         return {"FINISHED"}
 
 
+class NEOTRIX_OT_comments(bpy.types.Operator):
+    bl_idname = "neotrix_prism.file_comments"
+    bl_label = "Read / write file comments"
+    def execute(self, context):
+        if not bpy.data.filepath:
+            self.report({'WARNING'}, 'Save the Blender file before commenting.')
+            return {'CANCELLED'}
+        try:
+            core().neotrixBrowser().file_comments(bpy.data.filepath, 'Blender')
+        except Exception as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        return {'FINISHED'}
+
+
 class NEOTRIX_OT_tools(bpy.types.Operator):
     bl_idname = "neotrix_prism.tools"
     bl_label = "Production Tools"
@@ -78,12 +93,13 @@ class NEOTRIX_PT_workspace(bpy.types.Panel):
         box = layout.box()
         box.label(text="WORKING VERSION", icon="FILE_BLEND")
         box.operator("neotrix_prism.save_version", icon="FILE_TICK")
+        box.operator("neotrix_prism.file_comments", icon="TEXT")
         box = layout.box()
         box.label(text="PRODUCTION", icon="NODETREE")
         box.operator("neotrix_prism.tools", icon="RENDER_STILL")
 
 
-CLASSES = [NEOTRIX_OT_explorer, NEOTRIX_OT_save, NEOTRIX_OT_tools, NEOTRIX_PT_workspace]
+CLASSES = [NEOTRIX_OT_explorer, NEOTRIX_OT_save, NEOTRIX_OT_comments, NEOTRIX_OT_tools, NEOTRIX_PT_workspace]
 
 
 def pump():

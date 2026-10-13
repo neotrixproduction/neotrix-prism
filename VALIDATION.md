@@ -163,3 +163,22 @@ The scripts/ smoke checks create only dedicated QA files. They require the named
 creative applications and should be run with no unrelated active AE project.
 The portable runtime and test evidence live outside Git. User settings,
 production files, installation paths and credentials are not release sources.
+
+
+## Shared comments — 2026-10-13
+
+- Prism file details now exposes Read / write comments for every saved working
+  file type. The multiline discussion window displays author, timestamp and host.
+- Shared schema 1 preserves existing Blender records and appends UUID JSON records
+  atomically beside the document; malformed records remain visible as errors.
+- 60 tests passed, including concurrent append, legacy Blender compatibility,
+  Fusion/AE/Photoshop/Illustrator extensions, and real Qt append/refresh behavior.
+- A temporary real SMB fixture passed R: write -> UNC read and UNC write -> R: read.
+  The fixture was removed; production documents/comments were not changed.
+- Live Blender Neotrix System loaded the shared module and passed a root-independent
+  read/write check. Actual Prism dialog rendered and was opened for the active .blend.
+- Existing AE CEP/Blender Prism source panels updated; Fusion/Resolve companion
+  scripts installed. These new native entry points have not been exercised inside
+  AE/Fusion in this run. Photoshop panel source updated, not repackaged/reinstalled.
+- No distribution ZIP or executable rebuilt. Explorer Properties handler is not
+  part of this Prism integration. QA captures: artifacts/shared-comments.

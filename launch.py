@@ -32,6 +32,8 @@ def main():
     parser.add_argument("--expected-source")
     parser.add_argument("--root")
     parser.add_argument("--capture-dir")
+    parser.add_argument("--comments", help="Open shared discussion for a saved file")
+    parser.add_argument("--comment-app", default="Neotrix Prism")
     args = parser.parse_args()
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
@@ -50,7 +52,7 @@ def main():
     window = MainWindow(settings, core)
     if core:
         core._neotrix_window = window
-    if args.app == "Standalone" and not args.capture_dir:
+    if args.app == "Standalone" and not args.capture_dir and not args.comments:
         from neotrix_prism.bridge import Bridge
         try:
             window.bridge = Bridge(window)
@@ -58,7 +60,9 @@ def main():
         except OSError:
             window.status.setText("Adobe panel bridge is already running in another Neotrix Prism instance.")
     window.show()
-    if args.command == "SaveVersion":
+    if args.comments:
+        QTimer.singleShot(250, lambda: window.file_comments(args.comments, args.comment_app))
+    elif args.command == "SaveVersion":
         from neotrix_prism.integration import save_version_dialog
         QTimer.singleShot(250, lambda: save_version_dialog(core, window, args.expected_source))
     elif args.command == "StateManager":

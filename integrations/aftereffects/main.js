@@ -16,6 +16,21 @@ const server = net.createServer(function(socket) {
 server.on("error", function(error) { status.textContent = "Connection unavailable: " + error.message; });
 server.listen(19888, "127.0.0.1");
 function send(command) {
+    if (command === "fileComments") {
+        csInterface.evalScript('app.project.file ? app.project.file.fsName : ""', function(filepath) {
+            if (!filepath || filepath === "EvalScript error.") { status.textContent = "Save the AE project before commenting."; return; }
+            try {
+                const config = JSON.parse(fs.readFileSync(path.join(__dirname,"installation.json"),"utf8"));
+                const child = require("child_process").spawn(path.join(config.root,"runtime","pythonw.exe"),
+                    [path.join(config.root,"launch.py"), "--comments", filepath, "--comment-app", "After Effects"],
+                    {windowsHide:true,detached:true,stdio:"ignore"});
+                child.on("error", function(error) { status.textContent = error.message; });
+                child.unref();
+                status.textContent = "Shared file comments opened in Neotrix Prism.";
+            } catch(error) { status.textContent = error.message; }
+        });
+        return;
+    }
     const body = JSON.stringify({app:"aftereffects",command:command});
     const request = http.request({hostname:"127.0.0.1",port:16400,path:"/prism",method:"POST",
         headers:{"Content-Type":"application/json","Content-Length":Buffer.byteLength(body)}}, function(response) {

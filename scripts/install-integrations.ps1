@@ -62,6 +62,8 @@ if (-not $SkipPhotoshop) {
         $results += 'Photoshop: Creative Cloud UPI was not found. Install the CCX using Creative Cloud or load the manifest with UXP Developer Tool.'
     }
 }
+$commentInstaller = Join-Path $Root 'scripts\install-comments.ps1'
+if (Test-Path -LiteralPath $commentInstaller) { & $commentInstaller -Root $Root }
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Neotrix Prism.lnk'))
 $shortcut.TargetPath = Join-Path $Root 'Neotrix Prism.exe'
