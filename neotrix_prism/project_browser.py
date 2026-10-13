@@ -660,7 +660,7 @@ class GridCards(CardSurface):
         strip.setDevicePixelRatio(dpr);strip.fill(Qt.transparent)
         q=QPainter(strip);q.setRenderHints(QPainter.Antialiasing|QPainter.TextAntialiasing)
         font=QFont(self.font());font.setPixelSize(17);font.setWeight(QFont.DemiBold)
-        font.setHintingPreference(QFont.PreferVerticalHinting);q.setFont(font)
+        font.setHintingPreference(QFont.PreferNoHinting);q.setFont(font)
         title=QRectF(22,snap(height-67+14*(1-title_in),dpr),rect.width()-44,26)
         text=QFontMetrics(font).elidedText(entry['name'],Qt.ElideMiddle,int(title.width()))
         q.setOpacity(title_alpha*.55)

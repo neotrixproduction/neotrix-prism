@@ -7,6 +7,16 @@ from PySide6.QtWidgets import QApplication
 _loaded = False
 
 
+def configure_renderer():
+    """Choose native grayscale FreeType before the standalone QApplication exists.
+
+    Hosted panels keep their host's renderer, and explicit platform overrides
+    (including offscreen QA) take precedence.
+    """
+    if os.name == 'nt' and QApplication.instance() is None:
+        os.environ.setdefault('QT_QPA_PLATFORM', 'windows:fontengine=freetype')
+
+
 def initialize():
     global _loaded
     app = QApplication.instance()
@@ -24,8 +34,11 @@ def initialize():
     display, text = roles()
     font = QFont(text)
     font.setPixelSize(14)
-    font.setHintingPreference(QFont.PreferVerticalHinting)
-    font.setStyleStrategy(QFont.PreferAntialias | QFont.PreferQuality)
+    font.setWeight(QFont.Normal)
+    font.setHintingPreference(QFont.PreferNoHinting)
+    # Translucent widgets and cached label strips need grayscale coverage;
+    # RGB subpixel fringes do not composite cleanly onto changing backgrounds.
+    font.setStyleStrategy(QFont.PreferAntialias | QFont.NoSubpixelAntialias | QFont.PreferQuality)
     app.setFont(font)
 
 

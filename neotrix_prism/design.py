@@ -144,6 +144,8 @@ def stylesheet(dark=True):
     QPushButton#recentProject {text-align:left; padding:8px 12px; background:rgba(255,255,255,18); border:1px solid rgba(255,255,255,24); border-radius:12px;}
     QPushButton:disabled {color:rgba(255,255,255,105); background:rgba(255,255,255,10); border-color:rgba(255,255,255,22);}
     QLineEdit, QComboBox, QSpinBox, QTextEdit, QPlainTextEdit {background:rgba(6,4,22,70); border:1px solid rgba(255,255,255,40); border-radius:12px; padding:8px; color:#fbf8ff; selection-background-color:rgba(255,255,255,70);}
+    QLineEdit, QComboBox, QSpinBox {font-weight:500;}
+    QLineEdit, QTextEdit, QPlainTextEdit {placeholder-text-color:#bfc2d8;}
     QLineEdit:hover, QComboBox:hover {border-color:rgba(255,255,255,80);}
     QComboBox::drop-down {border:none; width:22px;}
     QComboBox QAbstractItemView {background:#1d1636; border:1px solid rgba(255,255,255,40); border-radius:12px; selection-background-color:rgba(255,255,255,40); color:TEXT;}

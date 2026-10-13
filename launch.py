@@ -37,6 +37,8 @@ def main():
     args = parser.parse_args()
     if args.app!='Standalone' or args.capture_dir or args.comments:
         os.environ['NEOTRIX_DISABLE_UPDATE_CHECK']='1'
+    from neotrix_prism.typography import configure_renderer
+    configure_renderer()
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
     from neotrix_prism.ui import MainWindow
