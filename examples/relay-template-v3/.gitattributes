@@ -1,0 +1,4 @@
+# Preserve the imported guide, embedded licenses and template instructions verbatim.
+COMMERCIAL_ADS_TEMPLATE_V3/** -text whitespace=cr-at-eol
+# Upstream embedded font licenses contain two intentional trailing spaces.
+COMMERCIAL_ADS_TEMPLATE_V3/FOLDERING_HELP.html whitespace=cr-at-eol,-blank-at-eol

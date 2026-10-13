@@ -101,6 +101,15 @@ moves, rerun the integration installer and shortcut creator.
 See [Start here](START_HERE.md) for another PC and [Setup](docs/SETUP.md) for
 project icons, shared stage labels, integrations and version saving.
 
+## Relay V3 template and examples
+
+The [Relay commercial production template V3](examples/relay-template-v3/README.md)
+includes the complete empty folder structure, interactive foldering guide,
+folder instructions, project icon placeholder and concrete naming examples.
+[Download its ZIP](examples/relay-template-v3/COMMERCIAL_ADS_TEMPLATE_V3.zip)
+or [read the folder map](examples/relay-template-v3/FOLDER_MAP.md) on GitHub.
+Copy the template for a new project; it contains no production documents.
+
 ## Interface and storage
 
 The dark interface combines rounded gradient cards, generated dimensional
