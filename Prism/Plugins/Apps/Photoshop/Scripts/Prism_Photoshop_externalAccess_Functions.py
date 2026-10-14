@@ -188,6 +188,8 @@ class Prism_Photoshop_externalAccess_Functions(object):
         Args:
             port: TCP port number to listen on (auto-selected if None)
         """
+        if os.getenv("NEOTRIX_PRISM") == "1":
+            return  # Neotrix uses its isolated whitelisted bridge on port 16400.
         if getattr(self, "serverApp", None):
             logger.debug("Photoshop server already running")
             return

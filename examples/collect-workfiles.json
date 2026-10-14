@@ -1,0 +1,121 @@
+{
+  "format": 1,
+  "name": "Collect project workfiles",
+  "revision": 1,
+  "nodes": [
+    {
+      "id": "0",
+      "type": "Project Input",
+      "position": [
+        30,
+        150
+      ],
+      "props": {}
+    },
+    {
+      "id": "1",
+      "type": "Find Files",
+      "position": [
+        270,
+        65
+      ],
+      "props": {}
+    },
+    {
+      "id": "2",
+      "type": "Filter Files",
+      "position": [
+        510,
+        65
+      ],
+      "props": {
+        "application": "Blender",
+        "contains": ""
+      }
+    },
+    {
+      "id": "3",
+      "type": "Build Destination Path",
+      "position": [
+        270,
+        290
+      ],
+      "props": {
+        "folder": "COLLECTIONS"
+      }
+    },
+    {
+      "id": "4",
+      "type": "Create Folder",
+      "position": [
+        510,
+        290
+      ],
+      "props": {}
+    },
+    {
+      "id": "5",
+      "type": "Copy Files",
+      "position": [
+        760,
+        150
+      ],
+      "props": {}
+    },
+    {
+      "id": "6",
+      "type": "Log",
+      "position": [
+        1000,
+        150
+      ],
+      "props": {
+        "message": "Workflow complete"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "0",
+      "output": "project",
+      "target": "1",
+      "input": "project"
+    },
+    {
+      "source": "1",
+      "output": "files",
+      "target": "2",
+      "input": "files"
+    },
+    {
+      "source": "0",
+      "output": "project",
+      "target": "3",
+      "input": "project"
+    },
+    {
+      "source": "3",
+      "output": "path",
+      "target": "4",
+      "input": "path"
+    },
+    {
+      "source": "2",
+      "output": "files",
+      "target": "5",
+      "input": "files"
+    },
+    {
+      "source": "4",
+      "output": "path",
+      "target": "5",
+      "input": "path"
+    },
+    {
+      "source": "5",
+      "output": "files",
+      "target": "6",
+      "input": "files"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "created": "2026-10-13",
+  "icons": [
+    {
+      "name": "activity",
+      "file": "activity.png",
+      "generator": "Codex built-in image generation",
+      "post": "alpha fringe cleanup, square re-centre with 9% margin, 640 px",
+      "prompt": "Use case: stylized-concept\nAsset type: hero illustration for a tile in a premium desktop creative-production app, shown at 120 to 260 px on a dark, colourful gradient card.\nSubject: a chunky glossy rounded alarm-free desk clock face with a raised pulse heartbeat line running across its glass front.\nStyle/medium: premium 3D render in the style of modern macOS app illustrations such as CleanMyMac: soft rounded chunky forms, glossy and satin materials, subtle frosted glass, gentle iridescent highlights, smooth subsurface sheen, crisp clean bevels, simple and iconic with no clutter.\nComposition/framing: one single object, centred, three-quarter view from slightly above and slightly left, the object fills about 78% of the square canvas with an even transparent margin on all sides, entire object visible and not cropped.\nLighting/mood: bright soft studio key light from the upper left, soft fill, subtle cool rim light, luminous and optimistic.\nColor palette: dominant mint teal with white face and coral pulse line; rich and saturated but not neon; deeper tones on the sides for depth.\nConstraints: transparent background with real alpha, no ground plane, no floor shadow, no pedestal, no background scene, no frame or border, no text, no numbers, no logos, no watermark.\nAvoid: flat vector style, emoji style, photorealistic photo look, tiny fussy details, generic yellow folder."
+    },
+    {
+      "name": "default",
+      "file": "default.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: production desktop UI icon for Neotrix Prism. Create ONE original premium 3D icon, no text. Thick solid extruded object with clearly visible 20% depth, generous rounded bevels, polished enamel and translucent glass accents, detailed ambient occlusion, luminous but restrained upper-left studio highlights. Nearly front-facing camera 12 degrees above and 15 degrees left. Glossy lavender, electric cyan, rose accents and darker rich sides. Recognizable silhouette at 48px, not flat SVG, not emoji, no generic yellow folder, no tiny decorative clutter. Centered square composition, object occupies 72% of canvas, generous transparent safe margin all sides, no pedestal, no ground plane, no baked background or checkerboard, no caption, no lettering. Genuine transparent alpha background. Cohesive luxurious creative software icon family.\nSubject: one rounded thick translucent violet squircle medallion with a large raised beveled faceted cyan diamond prism on its front, bright rose corner accent, substantial darker purple extruded sides. Original abstract default project artwork, no folder and no letters. Calm bold readable silhouette."
+    },
+    {
+      "name": "favorites",
+      "file": "favorites.png",
+      "generator": "Codex built-in image generation",
+      "post": "alpha fringe cleanup, square re-centre with 9% margin, 640 px",
+      "prompt": "Use case: stylized-concept\nAsset type: hero illustration for a tile in a premium desktop creative-production app, shown at 120 to 260 px on a dark, colourful gradient card.\nSubject: a chunky glossy five-point star with softly rounded points and a small floating sparkle beside it.\nStyle/medium: premium 3D render in the style of modern macOS app illustrations such as CleanMyMac: soft rounded chunky forms, glossy and satin materials, subtle frosted glass, gentle iridescent highlights, smooth subsurface sheen, crisp clean bevels, simple and iconic with no clutter.\nComposition/framing: one single object, centred, three-quarter view from slightly above and slightly left, the object fills about 78% of the square canvas with an even transparent margin on all sides, entire object visible and not cropped.\nLighting/mood: bright soft studio key light from the upper left, soft fill, subtle cool rim light, luminous and optimistic.\nColor palette: dominant warm rose pink with golden highlights; rich and saturated but not neon; deeper tones on the sides for depth.\nConstraints: transparent background with real alpha, no ground plane, no floor shadow, no pedestal, no background scene, no frame or border, no text, no numbers, no logos, no watermark.\nAvoid: flat vector style, emoji style, photorealistic photo look, tiny fussy details, generic yellow folder."
+    },
+    {
+      "name": "files",
+      "file": "files.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: production desktop UI icon for Neotrix Prism. Create ONE original premium 3D icon, no text. Thick solid extruded object with clearly visible 20% depth, generous rounded bevels, polished enamel and translucent glass accents, detailed ambient occlusion, luminous but restrained upper-left studio highlights. Nearly front-facing camera 12 degrees above and 15 degrees left. Glossy lavender, electric cyan, rose accents and darker rich sides. Recognizable silhouette at 48px, not flat SVG, not emoji, no generic yellow folder, no tiny decorative clutter. Centered square composition, object occupies 72% of canvas, generous transparent safe margin all sides, no pedestal, no ground plane, no baked background or checkerboard, no caption, no lettering. Genuine transparent alpha background. Cohesive luxurious creative software icon family.\nSubject: a thick elegant creative workfile document stack, three rounded lavender and cyan sheets with solid extruded edges, the front sheet bearing a raised abstract image motif, a luminous rose sphere above a smooth violet mountain shape. No text or letters. Clearly signifies creative files."
+    },
+    {
+      "name": "projects",
+      "file": "projects.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: production desktop UI icon for Neotrix Prism. Create ONE original premium 3D icon, no text. Thick solid extruded object with clearly visible 20% depth, generous rounded bevels, polished enamel and translucent glass accents, detailed ambient occlusion, luminous but restrained upper-left studio highlights. Nearly front-facing camera 12 degrees above and 15 degrees left. Glossy lavender, electric cyan, rose accents and darker rich sides. Recognizable silhouette at 48px, not flat SVG, not emoji, no generic yellow folder, no tiny decorative clutter. Centered square composition, object occupies 72% of canvas, generous transparent safe margin all sides, no pedestal, no ground plane, no baked background or checkerboard, no caption, no lettering. Genuine transparent alpha background. Cohesive luxurious creative software icon family.\nSubject: an innovative creative project hub: one large thick luminous violet faceted prism at the center, two substantial rounded glass creative asset tiles neatly layered behind at left and right, one cyan and one rose. Simple coherent compact object, not a folder. Strong physical depth and rounded surfaces."
+    },
+    {
+      "name": "versions",
+      "file": "versions.png",
+      "generator": "Codex built-in image generation",
+      "post": "alpha fringe cleanup, square re-centre with 9% margin, 640 px",
+      "prompt": "Use case: stylized-concept\nAsset type: hero illustration for a tile in a premium desktop creative-production app, shown at 120 to 260 px on a dark, colourful gradient card.\nSubject: three thick rounded cards fanned in a stack with one glossy circular arrow wrapping around them.\nStyle/medium: premium 3D render in the style of modern macOS app illustrations such as CleanMyMac: soft rounded chunky forms, glossy and satin materials, subtle frosted glass, gentle iridescent highlights, smooth subsurface sheen, crisp clean bevels, simple and iconic with no clutter.\nComposition/framing: one single object, centred, three-quarter view from slightly above and slightly left, the object fills about 78% of the square canvas with an even transparent margin on all sides, entire object visible and not cropped.\nLighting/mood: bright soft studio key light from the upper left, soft fill, subtle cool rim light, luminous and optimistic.\nColor palette: dominant blue-violet with cyan arrow; rich and saturated but not neon; deeper tones on the sides for depth.\nConstraints: transparent background with real alpha, no ground plane, no floor shadow, no pedestal, no background scene, no frame or border, no text, no numbers, no logos, no watermark.\nAvoid: flat vector style, emoji style, photorealistic photo look, tiny fussy details, generic yellow folder."
+    }
+  ],
+  "notes": "Original generated artwork for Neotrix Prism. Custom project artwork in _TOOLS/icon always has priority."
+}

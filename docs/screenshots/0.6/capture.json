@@ -1,0 +1,22 @@
+{
+  "version": "0.6.0",
+  "native_qt": true,
+  "fictional_data": true,
+  "logical_size": [
+    1360,
+    900
+  ],
+  "dpr": 1.5,
+  "screens": [
+    "activity.png",
+    "client-assets.png",
+    "favorites.png",
+    "preview.png",
+    "project-library.png",
+    "project-overview.png",
+    "settings.png",
+    "stages.png",
+    "versions.png",
+    "working-files.png"
+  ]
+}

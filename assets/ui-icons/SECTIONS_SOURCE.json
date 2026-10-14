@@ -1,0 +1,17 @@
+{
+  "created": "2026-10-13",
+  "assets": [
+    {
+      "name": "assets",
+      "file": "assets.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: Neotrix Prism desktop choice-card artwork. One original thick glossy 3D icon with genuine transparent background, matching a premium creative UI's violet glass, electric cyan and rose enamel icon family. Rounded substantial bevels and clearly visible extruded sides about 20% width, soft studio upper-left highlights, ambient occlusion, camera near frontal with 12 degrees above and 15 degrees left. Strong recognizable silhouette, polished glass and enamel, not flat vector or emoji. One compact centered model on square canvas occupying 72%, ample transparent margins, no background, pedestal, ground, text, letters or watermark.\nSubject: a beautifully sculpted shared creative asset library: one substantial beveled violet glass cube, with a raised cyan sphere nestled at its left and one rose rounded material swatch behind at right. Three large connected readable forms, elegant organized materials collection, no folder."
+    },
+    {
+      "name": "preview",
+      "file": "preview.png",
+      "generator": "Built-in image generation",
+      "prompt": "Use case: stylized-concept. Asset type: Neotrix Prism desktop choice-card artwork. One original thick glossy 3D icon with genuine transparent background, matching a premium creative UI's violet glass, electric cyan and rose enamel icon family. Rounded substantial bevels and clearly visible extruded sides about 20% width, soft studio upper-left highlights, ambient occlusion, camera near frontal with 12 degrees above and 15 degrees left. Strong recognizable silhouette, polished glass and enamel, not flat vector or emoji. One compact centered model on square canvas occupying 72%, ample transparent margins, no background, pedestal, ground, text, letters or watermark.\nSubject: one thick rounded glossy violet widescreen playback monitor, cyan glowing beveled screen inset with one large raised rose play triangle at its center. Compact minimal integral stand, darker extruded sides clearly visible, original creative preview icon, no UI controls or text."
+    }
+  ]
+}

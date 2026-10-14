@@ -1,0 +1,40 @@
+{
+  "product": "Neotrix Prism",
+  "release": "v0.6.5",
+  "date": "2026-10-14",
+  "baseline": "update-enabled 0.6.0 development snapshot at e334c35; not the published 0.6.0 preview",
+  "package_sha256": "db3c9afd5bb54cd22221c7831d3902575094b1838410503ee87e97a37e7dce18",
+  "package_bytes": 329065969,
+  "automated_tests": {
+    "passed": 96,
+    "failed": 0,
+    "includes": "Windows replacement, failed-runtime rollback, cancellation and hostile archives"
+  },
+  "live_checks": {
+    "restart": {
+      "discovered_public_release": true,
+      "downloaded_from_github": true,
+      "sha256_verified": true,
+      "installed_version": "0.6.5",
+      "helper_state": "complete",
+      "runtime_self_test": "passed",
+      "previous_version_retained": true,
+      "preferences_favorites_roots_and_project_preserved": true
+    },
+    "install_on_close": {
+      "discovered_public_release": true,
+      "downloaded_from_github": true,
+      "sha256_verified": true,
+      "installed_version": "0.6.5",
+      "helper_state": "complete",
+      "runtime_self_test": "passed",
+      "previous_version_retained": true,
+      "preferences_favorites_roots_and_project_preserved": true
+    }
+  },
+  "restart_verified": true,
+  "installed_text_renderer": "windows:fontengine=freetype",
+  "latest_release_check_at_0_6_5": "up to date",
+  "updater_fixes_required": false,
+  "legacy_0_6_0_preview": "manual first installation of 0.6.5 required"
+}

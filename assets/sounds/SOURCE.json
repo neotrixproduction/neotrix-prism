@@ -1,0 +1,368 @@
+{
+  "generator": "scripts/build_sounds.py (additive synthesis, shaped noise, synthetic room; no samples)",
+  "format": "48 kHz stereo 16-bit PCM WAV",
+  "key": "E-flat major pentatonic",
+  "loudness": "maximum loudness over 150 ms windows, ITU-R BS.1770 K-weighting",
+  "sounds": [
+    {
+      "name": "intro",
+      "file": "intro.wav",
+      "role": "App opening, choreographed with the first-light intro",
+      "seconds": 3.472,
+      "loudness_lufs": -24.0,
+      "peak_dbfs": -14.3
+    },
+    {
+      "name": "nav-whoosh-down",
+      "file": "nav-whoosh-down.wav",
+      "role": "Page change toward a later page",
+      "seconds": 0.862,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -21.2
+    },
+    {
+      "name": "nav-whoosh-up",
+      "file": "nav-whoosh-up.wav",
+      "role": "Page change toward an earlier page",
+      "seconds": 0.969,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -17.8
+    },
+    {
+      "name": "nav-projects",
+      "file": "nav-projects.wav",
+      "role": "Projects page arrives",
+      "seconds": 1.733,
+      "loudness_lufs": -26.0,
+      "peak_dbfs": -19.5
+    },
+    {
+      "name": "nav-favorites",
+      "file": "nav-favorites.wav",
+      "role": "Favorites page arrives",
+      "seconds": 1.733,
+      "loudness_lufs": -26.0,
+      "peak_dbfs": -20.4
+    },
+    {
+      "name": "nav-activity",
+      "file": "nav-activity.wav",
+      "role": "Activity page arrives",
+      "seconds": 1.773,
+      "loudness_lufs": -26.0,
+      "peak_dbfs": -19.7
+    },
+    {
+      "name": "nav-settings",
+      "file": "nav-settings.wav",
+      "role": "Settings page arrives",
+      "seconds": 1.73,
+      "loudness_lufs": -26.0,
+      "peak_dbfs": -20.2
+    },
+    {
+      "name": "open-left",
+      "file": "open-left.wav",
+      "role": "Card zoom from the left",
+      "seconds": 2.233,
+      "loudness_lufs": -22.0,
+      "peak_dbfs": -13.8
+    },
+    {
+      "name": "open-center",
+      "file": "open-center.wav",
+      "role": "Card zoom from the centre",
+      "seconds": 2.193,
+      "loudness_lufs": -22.0,
+      "peak_dbfs": -13.4
+    },
+    {
+      "name": "open-right",
+      "file": "open-right.wav",
+      "role": "Card zoom from the right",
+      "seconds": 2.227,
+      "loudness_lufs": -22.0,
+      "peak_dbfs": -14.6
+    },
+    {
+      "name": "back",
+      "file": "back.wav",
+      "role": "Back up a level",
+      "seconds": 1.58,
+      "loudness_lufs": -26.0,
+      "peak_dbfs": -18.2
+    },
+    {
+      "name": "refresh",
+      "file": "refresh.wav",
+      "role": "Refresh shockwave from the orb",
+      "seconds": 2.898,
+      "loudness_lufs": -21.0,
+      "peak_dbfs": -13.4
+    },
+    {
+      "name": "wave-0",
+      "file": "wave-0.wav",
+      "role": "Artwork jump on the wave, Bb4",
+      "seconds": 1.338,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -20.5
+    },
+    {
+      "name": "wave-1",
+      "file": "wave-1.wav",
+      "role": "Artwork jump on the wave, C5",
+      "seconds": 1.304,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -22.9
+    },
+    {
+      "name": "wave-2",
+      "file": "wave-2.wav",
+      "role": "Artwork jump on the wave, Eb5",
+      "seconds": 1.324,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -23.3
+    },
+    {
+      "name": "wave-3",
+      "file": "wave-3.wav",
+      "role": "Artwork jump on the wave, F5",
+      "seconds": 1.19,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -23.6
+    },
+    {
+      "name": "wave-4",
+      "file": "wave-4.wav",
+      "role": "Artwork jump on the wave, G5",
+      "seconds": 1.234,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -24.6
+    },
+    {
+      "name": "wave-5",
+      "file": "wave-5.wav",
+      "role": "Artwork jump on the wave, Bb5",
+      "seconds": 1.243,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -23.0
+    },
+    {
+      "name": "wave-6",
+      "file": "wave-6.wav",
+      "role": "Artwork jump on the wave, C6",
+      "seconds": 1.252,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -21.1
+    },
+    {
+      "name": "done",
+      "file": "done.wav",
+      "role": "Refresh finished: a soft low settle",
+      "seconds": 1.393,
+      "loudness_lufs": -31.0,
+      "peak_dbfs": -23.7
+    },
+    {
+      "name": "cancel",
+      "file": "cancel.wav",
+      "role": "Task cancelled",
+      "seconds": 1.225,
+      "loudness_lufs": -27.0,
+      "peak_dbfs": -20.8
+    },
+    {
+      "name": "success",
+      "file": "success.wav",
+      "role": "Saved or applied",
+      "seconds": 1.772,
+      "loudness_lufs": -24.0,
+      "peak_dbfs": -17.6
+    },
+    {
+      "name": "alert",
+      "file": "alert.wav",
+      "role": "Something needs attention",
+      "seconds": 1.472,
+      "loudness_lufs": -25.0,
+      "peak_dbfs": -20.1
+    },
+    {
+      "name": "favorite-add",
+      "file": "favorite-add.wav",
+      "role": "Added to favorites",
+      "seconds": 1.304,
+      "loudness_lufs": -25.0,
+      "peak_dbfs": -19.2
+    },
+    {
+      "name": "favorite-remove",
+      "file": "favorite-remove.wav",
+      "role": "Removed from favorites",
+      "seconds": 1.229,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -21.6
+    },
+    {
+      "name": "copy",
+      "file": "copy.wav",
+      "role": "Copied to clipboard",
+      "seconds": 0.563,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -22.4
+    },
+    {
+      "name": "toggle-on",
+      "file": "toggle-on.wav",
+      "role": "Switch on",
+      "seconds": 0.548,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -19.5
+    },
+    {
+      "name": "toggle-off",
+      "file": "toggle-off.wav",
+      "role": "Switch off",
+      "seconds": 0.622,
+      "loudness_lufs": -30.0,
+      "peak_dbfs": -20.0
+    },
+    {
+      "name": "menu",
+      "file": "menu.wav",
+      "role": "Menu or list opens",
+      "seconds": 0.719,
+      "loudness_lufs": -30.0,
+      "peak_dbfs": -22.3
+    },
+    {
+      "name": "dialog",
+      "file": "dialog.wav",
+      "role": "Dialog appears",
+      "seconds": 1.106,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -21.0
+    },
+    {
+      "name": "launch",
+      "file": "launch.wav",
+      "role": "File opens in its application",
+      "seconds": 1.736,
+      "loudness_lufs": -24.0,
+      "peak_dbfs": -16.6
+    },
+    {
+      "name": "hover-0",
+      "file": "hover-0.wav",
+      "role": "Card hover, Eb5",
+      "seconds": 0.678,
+      "loudness_lufs": -35.0,
+      "peak_dbfs": -28.2
+    },
+    {
+      "name": "hover-1",
+      "file": "hover-1.wav",
+      "role": "Card hover, F5",
+      "seconds": 0.579,
+      "loudness_lufs": -35.0,
+      "peak_dbfs": -30.1
+    },
+    {
+      "name": "hover-2",
+      "file": "hover-2.wav",
+      "role": "Card hover, G5",
+      "seconds": 0.682,
+      "loudness_lufs": -35.0,
+      "peak_dbfs": -29.9
+    },
+    {
+      "name": "hover-3",
+      "file": "hover-3.wav",
+      "role": "Card hover, Bb5",
+      "seconds": 0.646,
+      "loudness_lufs": -35.0,
+      "peak_dbfs": -30.2
+    },
+    {
+      "name": "hover-4",
+      "file": "hover-4.wav",
+      "role": "Card hover, C6",
+      "seconds": 0.662,
+      "loudness_lufs": -35.0,
+      "peak_dbfs": -28.2
+    },
+    {
+      "name": "hover-soft",
+      "file": "hover-soft.wav",
+      "role": "Row and button hover",
+      "seconds": 0.285,
+      "loudness_lufs": -39.0,
+      "peak_dbfs": -25.2
+    },
+    {
+      "name": "press-0",
+      "file": "press-0.wav",
+      "role": "Button press",
+      "seconds": 0.747,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -19.7
+    },
+    {
+      "name": "press-1",
+      "file": "press-1.wav",
+      "role": "Button press",
+      "seconds": 0.729,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -18.1
+    },
+    {
+      "name": "press-2",
+      "file": "press-2.wav",
+      "role": "Button press",
+      "seconds": 0.754,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -19.2
+    },
+    {
+      "name": "press-card",
+      "file": "press-card.wav",
+      "role": "Card press",
+      "seconds": 0.833,
+      "loudness_lufs": -28.0,
+      "peak_dbfs": -19.1
+    },
+    {
+      "name": "select",
+      "file": "select.wav",
+      "role": "Row selected",
+      "seconds": 0.455,
+      "loudness_lufs": -31.0,
+      "peak_dbfs": -23.5
+    },
+    {
+      "name": "shuffle",
+      "file": "shuffle.wav",
+      "role": "Search results reflow",
+      "seconds": 0.576,
+      "loudness_lufs": -30.0,
+      "peak_dbfs": -23.2
+    },
+    {
+      "name": "sidebar-open",
+      "file": "sidebar-open.wav",
+      "role": "Sidebar expands",
+      "seconds": 1.14,
+      "loudness_lufs": -29.0,
+      "peak_dbfs": -21.0
+    },
+    {
+      "name": "sidebar-close",
+      "file": "sidebar-close.wav",
+      "role": "Sidebar collapses",
+      "seconds": 1.173,
+      "loudness_lufs": -30.0,
+      "peak_dbfs": -21.6
+    }
+  ]
+}
